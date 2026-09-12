@@ -128,7 +128,8 @@ async def reporte_quincena(ctx):
         cd_fmt = f"{datos['c_diaria']:,}"
         acciones_fmt = f"{datos['acciones']:,.2f}"
         
-        linea = f"**{pos_actual}.** {movimiento} | **{nombre}** | 💲${acciones_fmt} | ✈️{vuelos_fmt} | 📊{cd_fmt} | ⚡**{datos['eficiencia']}%**"
+        # Eficiencia ubicada justo después del nombre y renglones más limpios
+        linea = f"**{pos_actual}.** {movimiento} | **{nombre}** (⚡**{datos['eficiencia']}%**) | 💲${acciones_fmt} | ✈️{vuelos_fmt} | 📊{cd_fmt}"
         lineas_reporte.append(linea)
 
     # 3. CREAR LOS PODIOS (Tops) EXCLUYENDO A KEYSER
@@ -163,25 +164,29 @@ async def reporte_quincena(ctx):
 
     await ctx.send(embed=embed_tops)
 
-    # 4. Enviar el ranking interno general en bloques (añadiendo la leyenda en el último bloque)
+    # 4. Enviar el ranking interno general en bloques con espaciado y leyenda al inicio del último
     chunk_size = 15
     total_chunks = (len(lineas_reporte) + chunk_size - 1) // chunk_size
     
     for idx_chunk, i in enumerate(range(0, len(lineas_reporte), chunk_size)):
         chunk = lineas_reporte[i:i + chunk_size]
-        embed_chunk = Embed(description="\n".join(chunk), color=discord.Color.blue())
         
-        # Si es el último bloque, agregamos la leyenda explicativa al pie
+        # Añadir doble salto de línea entre cada aerolínea para que queden más espaciadas
+        texto_bloque = "\n\n".join(chunk)
+        
+        # Si es el último bloque, anteponemos la leyenda al inicio
         if idx_chunk == total_chunks - 1:
             leyenda = (
                 "📖 **Leyenda:**\n"
                 "• ⬆️/⬇️/➖ : Movimiento en ranking de eficiencia\n"
                 "• 🆕 : Nueva aerolínea en la alianza\n"
-                "• 💲 : Valor de acciones | ✈️ : Vuelos totales\n"
-                "• 📊 : Contribución diaria (C/D) | ⚡ : % Eficiencia"
+                "• ⚡ : % Eficiencia | 💲 : Valor de acciones\n"
+                "• ✈️ : Vuelos totales | 📊 : Contribución diaria (C/D)\n"
+                "__________________________________________\n"
             )
-            embed_chunk.add_field(name="\u200b", value=leyenda, inline=False)
+            texto_bloque = leyenda + "\n" + texto_bloque
 
+        embed_chunk = Embed(description=texto_bloque, color=discord.Color.blue())
         await ctx.send(embed=embed_chunk)
 
 keep_alive()
