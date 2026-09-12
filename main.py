@@ -32,7 +32,6 @@ def cargar_datos_quincena(nombre_archivo):
                 
             partes = linea.strip().split(',')
             
-            # Identificar la línea de datos generales de la alianza
             if partes[0].strip().upper() == 'ALIANZA' and len(partes) >= 4:
                 try:
                     datos_alianza = {
@@ -44,7 +43,6 @@ def cargar_datos_quincena(nombre_archivo):
                     pass
                 continue
                 
-            # Procesar aerolíneas normales
             if len(partes) >= 5:
                 nombre = partes[0].strip()
                 try:
@@ -82,27 +80,22 @@ async def reporte_quincena(ctx):
         await ctx.send("⚠️ Faltan datos de aerolíneas en los archivos de texto.")
         return
 
-    # 1. Crear el Resumen General de la Alianza
+    # 1. Resumen General de la Alianza
     embed_resumen = Embed(title="📊 Reporte Quincenal HISPANA", color=discord.Color.green())
     
     if alianza_pasada and alianza_actual:
-        # Ranking
         avance_rank = alianza_pasada['rank'] - alianza_actual['rank']
         icono_rank = "⬆️" if avance_rank > 0 else "⬇️" if avance_rank < 0 else "➖"
         embed_resumen.add_field(name="🏆 Ranking Global", value=f"Anterior: **{alianza_pasada['rank']}**\nActual: **{alianza_actual['rank']}**\nMovimiento: {icono_rank} **{abs(avance_rank)}**", inline=True)
         
-        # Valor de Alianza
         crecimiento_total = alianza_actual['valor'] - alianza_pasada['valor']
         icono_val = "📈" if crecimiento_total > 0 else "📉"
         embed_resumen.add_field(name="💰 Valor de Alianza", value=f"Anterior: **${alianza_pasada['valor']:,.2f}**\nActual: **${alianza_actual['valor']:,.2f}**\nCrecimiento: {icono_val} **${crecimiento_total:,.2f}**", inline=True)
         
-        # Crecimiento Diario
         diff_crecimiento = alianza_actual['crecimiento_diario'] - alianza_pasada['crecimiento_diario']
         icono_crec = "🚀" if diff_crecimiento > 0 else "⚠️"
         embed_resumen.add_field(name="📊 Crecimiento Diario", value=f"Anterior: **${alianza_pasada['crecimiento_diario']:,.2f}**\nActual: **${alianza_actual['crecimiento_diario']:,.2f}**\nVariación: {icono_crec} **${diff_crecimiento:,.2f}**", inline=True)
-    else:
-        embed_resumen.description = "⚠️ No se encontraron los datos de la línea 'ALIANZA' al inicio de los archivos."
-
+    
     await ctx.send(embed=embed_resumen)
 
     # 2. Ordenar por Eficiencia y generar ranking interno
@@ -112,12 +105,16 @@ async def reporte_quincena(ctx):
     pos_pasadas_dict = {nombre: idx + 1 for idx, (nombre, datos) in enumerate(ranking_pasado)}
 
     lineas_reporte = []
+    movimientos_lista = [] # Aquí guardaremos quién subió y quién bajó
+
     for idx, (nombre, datos) in enumerate(ranking_actual):
         pos_actual = idx + 1
         pos_pasada = pos_pasadas_dict.get(nombre)
 
         if pos_pasada:
             diferencia = pos_pasada - pos_actual
+            movimientos_lista.append({'nombre': nombre, 'dif': diferencia}) # Guardar para los Tops
+            
             if diferencia > 0:
                 movimiento = f"⬆️ {diferencia}"
             elif diferencia < 0:
@@ -134,7 +131,42 @@ async def reporte_quincena(ctx):
         linea = f"**{pos_actual}.** {movimiento} | **{nombre}** | Acc: ${acciones_fmt} | Vuelos: {vuelos_fmt} | C/D: {cd_fmt} | Efi: **{datos['eficiencia']}%**"
         lineas_reporte.append(linea)
 
-    # 3. Enviar el ranking interno en bloques
+    # 3. CREAR LOS PODIOS (Tops)
+    # Filtrar y ordenar movimientos
+    los_que_subieron = sorted([x for x in movimientos_lista if x['dif'] > 0], key=lambda x: x['dif'], reverse=True)
+    los_que_bajaron = sorted([x for x in movimientos_lista if x['dif'] < 0], key=lambda x: x['dif']) # Ordena de más negativo a menos negativo
+
+    # Seleccionar Top 3
+    top3_eficientes = ranking_actual[:3]
+    
+    # Tomamos los 3 últimos del ranking, y los invertimos para que el de hasta abajo (el peor) salga de primero
+    top3_menos_eficientes = ranking_actual[-3:]
+    top3_menos_eficientes.reverse() 
+
+    top3_subieron = los_que_subieron[:3]
+    top3_bajaron = los_que_bajaron[:3]
+
+    # Armar visualmente el panel de Podios
+    embed_tops = Embed(title="🏆 Podios de la Quincena", color=discord.Color.gold())
+
+    txt_top_efi = "".join([f"**{i+1}. {nom}** ({dat['eficiencia']}%) \n" for i, (nom, dat) in enumerate(top3_eficientes)])
+    embed_tops.add_field(name="🌟 Más Eficientes", value=txt_top_efi, inline=True)
+
+    txt_bot_efi = "".join([f"**{i+1}. {nom}** ({dat['eficiencia']}%) \n" for i, (nom, dat) in enumerate(top3_menos_eficientes)])
+    embed_tops.add_field(name="🐌 Menos Eficientes", value=txt_bot_efi, inline=True)
+    
+    # Campo vacío para forzar que los siguientes caigan en la siguiente fila (estética)
+    embed_tops.add_field(name="\u200b", value="\u200b", inline=False) 
+
+    txt_top_sub = "".join([f"**{i+1}. {item['nombre']}** (⬆️ {item['dif']} puestos)\n" for i, item in enumerate(top3_subieron)])
+    embed_tops.add_field(name="🚀 Más Avanzaron", value=txt_top_sub if txt_top_sub else "Nadie avanzó", inline=True)
+
+    txt_top_baj = "".join([f"**{i+1}. {item['nombre']}** (⬇️ {abs(item['dif'])} puestos)\n" for i, item in enumerate(top3_bajaron)])
+    embed_tops.add_field(name="📉 Más Cayeron", value=txt_top_baj if txt_top_baj else "Nadie cayó", inline=True)
+
+    await ctx.send(embed=embed_tops)
+
+    # 4. Enviar el ranking interno en bloques
     chunk_size = 15
     for i in range(0, len(lineas_reporte), chunk_size):
         chunk = lineas_reporte[i:i + chunk_size]
