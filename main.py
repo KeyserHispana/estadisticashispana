@@ -116,11 +116,11 @@ async def reporte_quincena(ctx):
             movimientos_lista.append({'nombre': nombre, 'dif': diferencia})
             
             if diferencia > 0:
-                movimiento = f"⬆️ {diferencia}"
+                movimiento = f"⬆️{diferencia}"
             elif diferencia < 0:
-                movimiento = f"⬇️ {abs(diferencia)}"
+                movimiento = f"⬇️{abs(diferencia)}"
             else:
-                movimiento = "➖ 0"
+                movimiento = "➖0"
         else:
             movimiento = "🆕"
 
@@ -128,11 +128,10 @@ async def reporte_quincena(ctx):
         cd_fmt = f"{datos['c_diaria']:,}"
         acciones_fmt = f"{datos['acciones']:,.2f}"
         
-        linea = f"**{pos_actual}.** {movimiento} | **{nombre}** | Acc: ${acciones_fmt} | Vuelos: {vuelos_fmt} | C/D: {cd_fmt} | Efi: **{datos['eficiencia']}%**"
+        linea = f"**{pos_actual}.** {movimiento} | **{nombre}** | 💲${acciones_fmt} | ✈️{vuelos_fmt} | 📊{cd_fmt} | ⚡**{datos['eficiencia']}%**"
         lineas_reporte.append(linea)
 
     # 3. CREAR LOS PODIOS (Tops) EXCLUYENDO A KEYSER
-    # Filtramos la lista para que Keyser no entre en la evaluación de los podios
     ranking_sin_keyser = [item for item in ranking_actual if item[0].lower() != 'keyser']
     movimientos_sin_keyser = [x for x in movimientos_lista if x['nombre'].lower() != 'keyser']
 
@@ -156,19 +155,33 @@ async def reporte_quincena(ctx):
     
     embed_tops.add_field(name="\u200b", value="\u200b", inline=False) 
 
-    txt_top_sub = "".join([f"**{i+1}. {item['nombre']}** (⬆️ {item['dif']} puestos)\n" for i, item in enumerate(top3_subieron)])
+    txt_top_sub = "".join([f"**{i+1}. {item['nombre']}** (⬆️{item['dif']})\n" for i, item in enumerate(top3_subieron)])
     embed_tops.add_field(name="🚀 Más Avanzaron", value=txt_top_sub if txt_top_sub else "Nadie avanzó", inline=True)
 
-    txt_top_baj = "".join([f"**{i+1}. {item['nombre']}** (⬇️ {abs(item['dif'])} puestos)\n" for i, item in enumerate(top3_bajaron)])
+    txt_top_baj = "".join([f"**{i+1}. {item['nombre']}** (⬇️{abs(item['dif'])})\n" for i, item in enumerate(top3_bajaron)])
     embed_tops.add_field(name="📉 Más Cayeron", value=txt_top_baj if txt_top_baj else "Nadie cayó", inline=True)
 
     await ctx.send(embed=embed_tops)
 
-    # 4. Enviar el ranking interno general (aquí sí aparece Keyser)
+    # 4. Enviar el ranking interno general en bloques (añadiendo la leyenda en el último bloque)
     chunk_size = 15
-    for i in range(0, len(lineas_reporte), chunk_size):
+    total_chunks = (len(lineas_reporte) + chunk_size - 1) // chunk_size
+    
+    for idx_chunk, i in enumerate(range(0, len(lineas_reporte), chunk_size)):
         chunk = lineas_reporte[i:i + chunk_size]
         embed_chunk = Embed(description="\n".join(chunk), color=discord.Color.blue())
+        
+        # Si es el último bloque, agregamos la leyenda explicativa al pie
+        if idx_chunk == total_chunks - 1:
+            leyenda = (
+                "📖 **Leyenda:**\n"
+                "• ⬆️/⬇️/➖ : Movimiento en ranking de eficiencia\n"
+                "• 🆕 : Nueva aerolínea en la alianza\n"
+                "• 💲 : Valor de acciones | ✈️ : Vuelos totales\n"
+                "• 📊 : Contribución diaria (C/D) | ⚡ : % Eficiencia"
+            )
+            embed_chunk.add_field(name="\u200b", value=leyenda, inline=False)
+
         await ctx.send(embed=embed_chunk)
 
 keep_alive()
