@@ -128,11 +128,10 @@ async def reporte_quincena(ctx):
         cd_fmt = f"{datos['c_diaria']:,}"
         acciones_fmt = f"{datos['acciones']:,.2f}"
         
-        # Eficiencia ubicada justo después del nombre y renglones más limpios
         linea = f"**{pos_actual}.** {movimiento} | **{nombre}** (⚡**{datos['eficiencia']}%**) | 💲${acciones_fmt} | ✈️{vuelos_fmt} | 📊{cd_fmt}"
         lineas_reporte.append(linea)
 
-    # 3. CREAR LOS PODIOS (Tops) EXCLUYENDO A KEYSER
+    # 3. CREAR LOS PODIOS (Tops) EN UN SOLO RENGLÓN EXCLUYENDO A KEYSER
     ranking_sin_keyser = [item for item in ranking_actual if item[0].lower() != 'keyser']
     movimientos_sin_keyser = [x for x in movimientos_lista if x['nombre'].lower() != 'keyser']
 
@@ -148,40 +147,38 @@ async def reporte_quincena(ctx):
 
     embed_tops = Embed(title="🏆 Podios de la Quincena", color=discord.Color.gold())
 
-    txt_top_efi = "".join([f"**{i+1}. {nom}** ({dat['eficiencia']}%) \n" for i, (nom, dat) in enumerate(top3_eficientes)])
+    # Formato en una sola línea para eficiencia
+    txt_top_efi = "".join([f"**{i+1}.** {nom} (**{dat['eficiencia']}%**)\n" for i, (nom, dat) in enumerate(top3_eficientes)])
     embed_tops.add_field(name="🌟 Más Eficientes", value=txt_top_efi if txt_top_efi else "N/A", inline=True)
 
-    txt_bot_efi = "".join([f"**{i+1}. {nom}** ({dat['eficiencia']}%) \n" for i, (nom, dat) in enumerate(top3_menos_eficientes)])
+    txt_bot_efi = "".join([f"**{i+1}.** {nom} (**{dat['eficiencia']}%**)\n" for i, (nom, dat) in enumerate(top3_menos_eficientes)])
     embed_tops.add_field(name="🐌 Menos Eficientes", value=txt_bot_efi if txt_bot_efi else "N/A", inline=True)
     
     embed_tops.add_field(name="\u200b", value="\u200b", inline=False) 
 
-    txt_top_sub = "".join([f"**{i+1}. {item['nombre']}** (⬆️{item['dif']})\n" for i, item in enumerate(top3_subieron)])
+    # Formato en una sola línea para movimientos
+    txt_top_sub = "".join([f"**{i+1}.** {item['nombre']} (⬆️{item['dif']})\n" for i, item in enumerate(top3_subieron)])
     embed_tops.add_field(name="🚀 Más Avanzaron", value=txt_top_sub if txt_top_sub else "Nadie avanzó", inline=True)
 
-    txt_top_baj = "".join([f"**{i+1}. {item['nombre']}** (⬇️{abs(item['dif'])})\n" for i, item in enumerate(top3_bajaron)])
+    txt_top_baj = "".join([f"**{i+1}.** {item['nombre']} (⬇️{abs(item['dif'])})\n" for i, item in enumerate(top3_bajaron)])
     embed_tops.add_field(name="📉 Más Cayeron", value=txt_top_baj if txt_top_baj else "Nadie cayó", inline=True)
 
     await ctx.send(embed=embed_tops)
 
-    # 4. Enviar el ranking interno general en bloques con espaciado y leyenda al inicio del último
+    # 4. Enviar el ranking general (con la leyenda al inicio del primer bloque y espaciado)
     chunk_size = 15
-    total_chunks = (len(lineas_reporte) + chunk_size - 1) // chunk_size
     
     for idx_chunk, i in enumerate(range(0, len(lineas_reporte), chunk_size)):
         chunk = lineas_reporte[i:i + chunk_size]
-        
-        # Añadir doble salto de línea entre cada aerolínea para que queden más espaciadas
         texto_bloque = "\n\n".join(chunk)
         
-        # Si es el último bloque, anteponemos la leyenda al inicio
-        if idx_chunk == total_chunks - 1:
+        # Si es el PRIMER bloque del ranking, le ponemos la leyenda justo antes
+        if idx_chunk == 0:
             leyenda = (
-                "📖 **Leyenda:**\n"
-                "• ⬆️/⬇️/➖ : Movimiento en ranking de eficiencia\n"
-                "• 🆕 : Nueva aerolínea en la alianza\n"
-                "• ⚡ : % Eficiencia | 💲 : Valor de acciones\n"
-                "• ✈️ : Vuelos totales | 📊 : Contribución diaria (C/D)\n"
+                "📖 **Leyenda del Ranking:**\n"
+                "• ⬆️/⬇️/➖ : Movimiento en eficiencia | 🆕 : Nueva\n"
+                "• ⚡ : % Eficiencia | 💲 : Acciones\n"
+                "• ✈️ : Vuelos | 📊 : Contribución Diaria (C/D)\n"
                 "__________________________________________\n"
             )
             texto_bloque = leyenda + "\n" + texto_bloque
