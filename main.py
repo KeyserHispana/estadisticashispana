@@ -131,15 +131,16 @@ async def reporte_quincena(ctx):
         linea = f"**{pos_actual}.** {movimiento} | **{nombre}** (⚡**{datos['eficiencia']}%**) | 💲${acciones_fmt} | ✈️{vuelos_fmt} | 📊{cd_fmt}"
         lineas_reporte.append(linea)
 
-    # 3. CREAR LOS PODIOS (Tops) EN UN SOLO RENGLÓN EXCLUYENDO A KEYSER
-    ranking_sin_keyser = [item for item in ranking_actual if item[0].lower() != 'keyser']
+    # 3. CREAR LOS PODIOS (Tops) EN UN SOLO RENGLÓN EXCLUYENDO A KEYSER Y A LOS NUEVOS
+    # Solo se evalúan las aerolíneas que no son 'keyser' Y que estaban en la quincena pasada
+    ranking_para_podios = [item for item in ranking_actual if item[0].lower() != 'keyser' and item[0] in pos_pasadas_dict]
     movimientos_sin_keyser = [x for x in movimientos_lista if x['nombre'].lower() != 'keyser']
 
     los_que_subieron = sorted([x for x in movimientos_sin_keyser if x['dif'] > 0], key=lambda x: x['dif'], reverse=True)
     los_que_bajaron = sorted([x for x in movimientos_sin_keyser if x['dif'] < 0], key=lambda x: x['dif']) 
 
-    top3_eficientes = ranking_sin_keyser[:3]
-    top3_menos_eficientes = ranking_sin_keyser[-3:]
+    top3_eficientes = ranking_para_podios[:3]
+    top3_menos_eficientes = ranking_para_podios[-3:]
     top3_menos_eficientes.reverse() 
 
     top3_subieron = los_que_subieron[:3]
