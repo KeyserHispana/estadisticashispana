@@ -114,9 +114,17 @@ async def reporte_quincena(ctx):
         await ctx.send("⚠️ Faltan datos de aerolíneas en los archivos de texto.")
         return
         
-    # Guardar en la memoria histórica automáticamente
+    # --- GESTIÓN DE MEMORIA AUTOMÁTICA ---
     fecha_hoy = datetime.now().strftime("%Y-%m-%d")
+    
+    # Si el historial está vacío (es la primera vez que se ejecuta), le inyectamos la base pasada
+    historial_temp = cargar_historial()
+    if len(historial_temp) == 0:
+        guardar_en_historial("2026-08-26", datos_pasados)
+        
+    # Guardamos la quincena actual
     guardar_en_historial(fecha_hoy, datos_actuales)
+    # ---------------------------------------
 
     # 1. Resumen General de la Alianza
     embed_resumen = Embed(title="📊 Reporte Quincenal HISPANA", color=discord.Color.green())
