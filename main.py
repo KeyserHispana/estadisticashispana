@@ -125,7 +125,6 @@ async def reporte_quincena(ctx):
     guardar_en_historial(fecha_reporte_actual, datos_actuales)
     # ----------------------------------------------------
 
-    # Extracción de fechas para los embeds
     f_pasada = alianza_pasada.get('fecha', 'Anterior') if alianza_pasada else 'Anterior'
     f_actual = alianza_actual.get('fecha', 'Actual')
 
@@ -186,7 +185,6 @@ async def reporte_quincena(ctx):
     top3_subieron = los_que_subieron[:3]
     top3_bajaron = los_que_bajaron[:3]
 
-    # Título del podio actualizado con la fecha actual del reporte
     embed_tops = Embed(title=f"🏆 Podios de la Quincena ({f_actual})", color=discord.Color.gold())
 
     txt_top_efi = "".join([f"**{i+1}.** {nom} (**{dat['eficiencia']}%**)\n" for i, (nom, dat) in enumerate(top3_eficientes)])
@@ -220,6 +218,116 @@ async def reporte_quincena(ctx):
 
         embed_chunk = Embed(description=texto_bloque, color=discord.Color.blue())
         await ctx.send(embed=embed_chunk)
+
+
+# --- COMANDO PÚBLICO 1: TARJETA DE AEROLÍNEA (!mi_aerolinea [Nombre]) ---
+@bot.command(name='mi_aerolinea')
+async def mi_aerolinea(ctx, *, nombre_buscado: str = None):
+    if not nombre_buscado:
+        await ctx.send("⚠️ Debes indicar el nombre de la aerolínea. Ejemplo: `!mi_aerolinea Fly Aces`")
+        return
+
+    _, datos_pasados = cargar_datos_quincena('quincena_pasada.txt')
+    _, datos_actuales = cargar_datos_quincena('quincena_actual.txt')
+
+    if not datos_actuales:
+        await ctx.send("⚠️ No hay datos actuales cargados en el sistema.")
+        return
+
+    # Buscar coincidencia flexible (insensible a mayúsculas/minúsculas)
+    nombre_encontrado = None
+    for nom in datos_actuales.keys():
+        if nombre_buscado.strip().lower() == nom.lower():
+            nombre_encontrado = nom
+            break
+
+    if not nombre_encontrado:
+        await ctx.send(f"❌ No se encontró ninguna aerolínea con el nombre **'{nombre_buscado}'** en el registro actual.")
+        return
+
+    # Calcular ranking actual y pasado
+    ranking_actual = sorted(datos_actuales.items(), key=lambda x: x[1]['eficiencia'], reverse=True)
+    ranking_pasado = sorted(datos_pasados.items(), key=lambda x: x[1]['eficiencia'], reverse=True) if datos_pasados else []
+
+    pos_actual = next(idx + 1 for idx, (nom, _) in enumerate(ranking_actual) if nom == nombre_encontrado)
+    pos_pasada_dict = {nom: idx + 1 for idx, (nom, _) in enumerate(ranking_pasado)}
+    
+    datos_aerolinea = datos_actuales[nombre_encontrado]
+    
+    # Calcular movimiento
+    if nombre_encontrado in pos_pasada_dict:
+        dif = pos_pasada_dict[nombre_encontrado] - pos_actual
+        if dif > 0: mov_str = f"⬆️ Subió {dif} puesto(s)"
+        elif dif < 0: mov_str = f"⬇️ Cayó {abs(dif)} puesto(s)"
+        else: mov_str = "➖ Se mantuvo"
+    else:
+        mov_str = "🆕 Aerolínea Nueva"
+
+    embed = Embed(title=f"✈️ Reporte de Aerolínea: {nombre_encontrado}", color=discord.Color.blue())
+    embed.add_field(name="⚡ Eficiencia Actual", value=f"**{datos_aerolinea['eficiencia']}%**", inline=True)
+    embed.add_field(name="🏆 Posición en Ranking", value=f"**#{pos_actual}**", inline=True)
+    embed.add_field(name="📈 Movimiento", value=mov_str, inline=True)
+    embed.add_field(name="📊 Promedio C/D", value=f"${datos_aerolinea['promedio']:,.0f}", inline=True)
+    embed.add_field(name="🚀 Potencial C/D", value=f"${datos_aerolinea['potencial']:,.1f}", inline=True)
+
+    await ctx.send(embed=embed)
+
+
+# --- COMANDO PÚBLICO 2: DUELO QUINCENAL (!enfrentar [A] vs [B]) ---
+@bot.command(name='enfrentar')
+async def enfrentar(ctx, *, texto_duelo: str = None):
+    if not texto_duelo or 'vs' not in texto_duelo.lower():
+        await ctx.send("⚠️ Formato incorrecto. Debes usar: `!enfrentar Aerolinea A vs Aerolinea B`")
+        return
+
+    partes = texto_duelo.split('vs' if 'vs' in texto_duelo else 'VS')
+    if len(partes) != 2:
+        partes = texto_duelo.lower().split('vs')
+        
+    if len(partes) != 2:
+        await ctx.send("⚠️ No se pudo interpretar el duelo. Usa el formato: `!enfrentar Aerolinea A vs Aerolinea B`")
+        return
+
+    busq_a = partes[0].strip()
+    busq_b = partes[1].strip()
+
+    _, datos_actuales = cargar_datos_quincena('quincena_actual.txt')
+    if not datos_actuales:
+        await ctx.send("⚠️ No hay datos actuales cargados.")
+        return
+
+    # Encontrar aerolínea A
+    nom_a = next((nom for nom in datos_actuales.keys() if busq_a.lower() == nom.lower()), None)
+    # Encontrar aerolínea B
+    nom_b = next((nom for nom in datos_actuales.keys() if busq_b.lower() == nom.lower()), None)
+
+    if not nom_a or not nom_b:
+        await ctx.send(f"❌ No se pudo encontrar a una o ambas aerolíneas en el registro. Asegúrate de escribir bien los nombres.\n- Buscaste: **{busq_a}** y **{busq_b}**")
+        return
+
+    ranking_actual = sorted(datos_actuales.items(), key=lambda x: x[1]['eficiencia'], reverse=True)
+    pos_a = next(idx + 1 for idx, (nom, _) in enumerate(ranking_actual) if nom == nom_a)
+    pos_b = next(idx + 1 for idx, (nom, _) in enumerate(ranking_actual) if nom == nom_b)
+
+    d_a = datos_actuales[nom_a]
+    d_b = datos_actuales[nom_b]
+
+    embed = Embed(title=f"⚔️ Duelo Quincenal: {nom_a} vs {nom_b}", color=discord.Color.purple())
+    
+    embed.add_field(name=f"🛫 {nom_a}", value=f"• Puesto: **#{pos_a}**\n• Eficiencia: **{d_a['eficiencia']}%**\n• Prom: **${d_a['promedio']:,.0f}**\n• Pot: **${d_a['potencial']:,.1f}**", inline=True)
+    embed.add_field(name=f"🛫 {nom_b}", value=f"• Puesto: **#{pos_b}**\n• Eficiencia: **{d_b['eficiencia']}%**\n• Prom: **${d_b['promedio']:,.0f}**\n• Pot: **${d_b['potencial']:,.1f}**", inline=True)
+
+    # Determinar ganador objetivo en eficiencia
+    if d_a['eficiencia'] > d_b['eficiencia']:
+        ganador_txt = f"🏆 **Ganador en Eficiencia:** {nom_a} (+{d_a['eficiencia'] - d_b['eficiencia']}% vs {nom_b})"
+    elif d_b['eficiencia'] > d_a['eficiencia']:
+        ganador_txt = f"🏆 **Ganador en Eficiencia:** {nom_b} (+{d_b['eficiencia'] - d_a['eficiencia']}% vs {nom_a})"
+    else:
+        ganador_txt = "🤝 **Empate técnico** en porcentaje de eficiencia."
+
+    embed.add_field(name="📊 Resultado del Enfrentamiento", value=ganador_txt, inline=False)
+
+    await ctx.send(embed=embed)
 
 
 # --- COMANDO: GRÁFICA DE RANKING CON FECHAS REALES ---
