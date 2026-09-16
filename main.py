@@ -36,13 +36,9 @@ def cargar_historial():
 def guardar_en_historial(fecha, datos_actuales):
     historial = cargar_historial()
     
-    # Extraer solo la eficiencia
     datos_guardar = {nombre: datos['eficiencia'] for nombre, datos in datos_actuales.items()}
-    
-    # Guardar usando la fecha como llave
     historial[fecha] = datos_guardar
     
-    # Mantener solo las últimas 6 fechas registradas
     fechas_ordenadas = sorted(historial.keys())
     if len(fechas_ordenadas) > 6:
         fechas_a_borrar = fechas_ordenadas[:-6]
@@ -78,7 +74,6 @@ def cargar_datos_quincena(nombre_archivo):
                     pass
                 continue
                 
-            # FORMATO EXACTO: Nombre, Eficiencia, Promedio, Potencial
             if len(partes) >= 4:
                 nombre = partes[0].strip()
                 try:
@@ -216,7 +211,7 @@ async def reporte_quincena(ctx):
         await ctx.send(embed=embed_chunk)
 
 
-# --- NUEVO COMANDO REESTRUCTURADO: GRÁFICA DE RANKING ---
+# --- NUEVO COMANDO: GRÁFICA DE RANKING MEJORADA ---
 @bot.command(name='grafica_eficiencia')
 async def grafica_eficiencia(ctx):
     historial = cargar_historial()
@@ -228,24 +223,19 @@ async def grafica_eficiencia(ctx):
     fechas = sorted(historial.keys())
     fecha_actual = fechas[-1]
     
-    # 1. Transformar Eficiencias en Puestos de Ranking por cada fecha
+    # Transformar Eficiencias en Puestos de Ranking por fecha
     rankings_por_fecha = {}
     for fecha in fechas:
-        # Extraer aerolíneas y ordenar de mayor a menor eficiencia
         datos_fecha = {a: e for a, e in historial[fecha].items() if e is not None}
         ordenados = sorted(datos_fecha.items(), key=lambda x: x[1], reverse=True)
-        # Asignar puesto (1, 2, 3...)
         rankings_por_fecha[fecha] = {item[0]: idx + 1 for idx, item in enumerate(ordenados)}
         
-    # 2. Determinar el ranking de la fecha actual para ordenar el Eje Y
     ranking_actual_ordenado = sorted(rankings_por_fecha[fecha_actual].items(), key=lambda x: x[1])
     aerolineas_actuales = [a for a, r in ranking_actual_ordenado]
     
-    # 3. Ajustar tamaño de la gráfica para que quepan todos los nombres cómodamente
     altura_figura = max(8, len(aerolineas_actuales) * 0.4) 
-    plt.figure(figsize=(12, altura_figura))
+    fig, ax = plt.subplots(figsize=(12, altura_figura))
     
-    # 4. Graficar las líneas (Puesto vs Fecha)
     for aerolinea in aerolineas_actuales:
         valores_y = []
         fechas_plot = []
@@ -256,36 +246,44 @@ async def grafica_eficiencia(ctx):
                 fechas_plot.append(fecha)
         
         if len(valores_y) > 0:
-            plt.plot(fechas_plot, valores_y, marker='o', linewidth=2)
+            ax.plot(fechas_plot, valores_y, marker='o', linewidth=2)
 
-    # 5. Configurar Eje Y (Invertido para que el #1 esté arriba)
-    plt.gca().invert_yaxis()
+    ax.invert_yaxis() # Invertir para que el #1 quede arriba
     
-    # Crear las etiquetas personalizadas para el Eje Y (Ej: "1. Fly Aces")
     ticks_y = []
     etiquetas_y = []
     for aerolinea, rank in ranking_actual_ordenado:
         ticks_y.append(rank)
         etiquetas_y.append(f"{rank}. {aerolinea}")
         
-    plt.yticks(ticks=ticks_y, labels=etiquetas_y, fontsize=10)
+    # Eje Y Izquierdo (Solo números)
+    ax.set_yticks(ticks_y)
+    ax.set_yticklabels([str(t) for t in ticks_y], fontsize=10, color='gray')
     
-    # 6. Estilos Visuales (Sin leyenda a la derecha)
+    # Eje Y Derecho (Nombres actuales)
+    ax2 = ax.twinx()
+    ax2.set_ylim(ax.get_ylim())
+    ax2.set_yticks(ticks_y)
+    ax2.set_yticklabels(etiquetas_y, fontsize=10, weight='bold')
+    
     plt.title('Evolución de Posiciones en HISPANA', fontsize=16, pad=20, weight='bold')
-    plt.grid(True, linestyle='--', alpha=0.5, axis='x') # Solo rejilla vertical para no ensuciar
+    ax.grid(True, linestyle='--', alpha=0.5, axis='x') 
     
-    # Limpiar bordes innecesarios
-    plt.gca().spines['top'].set_visible(False)
-    plt.gca().spines['right'].set_visible(False)
-    plt.gca().spines['left'].set_visible(False)
-    plt.gca().spines['bottom'].set_color('#dddddd')
+    # Limpiar bordes innecesarios para diseño limpio
+    for spine in ['top', 'bottom', 'right', 'left']:
+        ax.spines[spine].set_visible(False)
+        ax2.spines[spine].set_visible(False)
+        
+    ax.tick_params(axis='y', length=0)
+    ax2.tick_params(axis='y', length=0)
+    ax.tick_params(axis='x', color='gray')
     
     plt.tight_layout()
 
     buffer = io.BytesIO()
     plt.savefig(buffer, format='png', bbox_inches='tight')
     buffer.seek(0)
-    plt.close()
+    plt.close(fig)
 
     archivo_discord = discord.File(buffer, filename='grafica_posiciones.png')
     await ctx.send("📈 **Evolución del Ranking Interno (Basado en Eficiencia)**", file=archivo_discord)
