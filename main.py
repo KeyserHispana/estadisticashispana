@@ -125,7 +125,7 @@ async def reporte_quincena(ctx):
     guardar_en_historial(fecha_reporte_actual, datos_actuales)
     # ----------------------------------------------------
 
-    # Extracción de fechas para el embed
+    # Extracción de fechas para los embeds
     f_pasada = alianza_pasada.get('fecha', 'Anterior') if alianza_pasada else 'Anterior'
     f_actual = alianza_actual.get('fecha', 'Actual')
 
@@ -186,7 +186,8 @@ async def reporte_quincena(ctx):
     top3_subieron = los_que_subieron[:3]
     top3_bajaron = los_que_bajaron[:3]
 
-    embed_tops = Embed(title="🏆 Podios de la Quincena", color=discord.Color.gold())
+    # Título del podio actualizado con la fecha actual del reporte
+    embed_tops = Embed(title=f"🏆 Podios de la Quincena ({f_actual})", color=discord.Color.gold())
 
     txt_top_efi = "".join([f"**{i+1}.** {nom} (**{dat['eficiencia']}%**)\n" for i, (nom, dat) in enumerate(top3_eficientes)])
     embed_tops.add_field(name="🌟 Más Eficientes", value=txt_top_efi if txt_top_efi else "N/A", inline=True)
@@ -299,7 +300,7 @@ async def grafica_eficiencia(ctx):
         
     ax.tick_params(axis='y', length=0)
     ax2.tick_params(axis='y', length=0)
-    ax2.tick_params(axis='x', color='gray')
+    ax.tick_params(axis='x', color='gray')
     
     plt.tight_layout()
 
