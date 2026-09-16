@@ -117,16 +117,13 @@ async def reporte_quincena(ctx):
     # --- GESTIÓN DE MEMORIA AUTOMÁTICA ---
     fecha_hoy = datetime.now().strftime("%Y-%m-%d")
     
-    # Si el historial está vacío (es la primera vez que se ejecuta), le inyectamos la base pasada
     historial_temp = cargar_historial()
     if len(historial_temp) == 0:
         guardar_en_historial("2026-08-26", datos_pasados)
         
-    # Guardamos la quincena actual
     guardar_en_historial(fecha_hoy, datos_actuales)
     # ---------------------------------------
 
-    # 1. Resumen General de la Alianza
     embed_resumen = Embed(title="📊 Reporte Quincenal HISPANA", color=discord.Color.green())
     if alianza_pasada and alianza_actual:
         avance_rank = alianza_pasada['rank'] - alianza_actual['rank']
@@ -143,7 +140,6 @@ async def reporte_quincena(ctx):
         
     await ctx.send(embed=embed_resumen)
 
-    # 2. Ordenar por Eficiencia y generar ranking interno
     ranking_pasado = sorted(datos_pasados.items(), key=lambda x: x[1]['eficiencia'], reverse=True)
     ranking_actual = sorted(datos_actuales.items(), key=lambda x: x[1]['eficiencia'], reverse=True)
 
@@ -169,11 +165,9 @@ async def reporte_quincena(ctx):
         prom_fmt = f"{datos['promedio']:,.0f}"
         pot_fmt = f"{datos['potencial']:,.1f}"
         
-        # LINEA OPTIMIZADA: Solo Eficiencia, Promedio y Potencial
         linea = f"**{pos_actual}.** {movimiento} | **{nombre}** (⚡**{datos['eficiencia']}%**) | Prom:**{prom_fmt}** | Pot:**{pot_fmt}**"
         lineas_reporte.append(linea)
 
-    # 3. CREAR LOS PODIOS EXCLUYENDO A KEYSER Y A LOS NUEVOS
     ranking_para_podios = [item for item in ranking_actual if item[0].lower() != 'keyser' and item[0] in pos_pasadas_dict]
     movimientos_sin_keyser = [x for x in movimientos_lista if x['nombre'].lower() != 'keyser']
 
@@ -205,7 +199,6 @@ async def reporte_quincena(ctx):
 
     await ctx.send(embed=embed_tops)
 
-    # 4. Enviar el ranking general
     chunk_size = 15
     for idx_chunk, i in enumerate(range(0, len(lineas_reporte), chunk_size)):
         chunk = lineas_reporte[i:i + chunk_size]
@@ -223,7 +216,7 @@ async def reporte_quincena(ctx):
         await ctx.send(embed=embed_chunk)
 
 
-# --- NUEVO COMANDO: GRÁFICA DE EFICIENCIA ---
+# --- NUEVO COMANDO REESTRUCTURADO: GRÁFICA DE RANKING ---
 @bot.command(name='grafica_eficiencia')
 async def grafica_eficiencia(ctx):
     historial = cargar_historial()
@@ -233,37 +226,69 @@ async def grafica_eficiencia(ctx):
         return
 
     fechas = sorted(historial.keys())
+    fecha_actual = fechas[-1]
     
-    aerolineas_todas = set()
-    for datos_fecha in historial.values():
-        aerolineas_todas.update(datos_fecha.keys())
-
-    plt.figure(figsize=(10, 6))
-    
-    for aerolinea in aerolineas_todas:
-        valores_y = []
-        for fecha in fechas:
-            eficiencia = historial[fecha].get(aerolinea, None)
-            valores_y.append(eficiencia)
+    # 1. Transformar Eficiencias en Puestos de Ranking por cada fecha
+    rankings_por_fecha = {}
+    for fecha in fechas:
+        # Extraer aerolíneas y ordenar de mayor a menor eficiencia
+        datos_fecha = {a: e for a, e in historial[fecha].items() if e is not None}
+        ordenados = sorted(datos_fecha.items(), key=lambda x: x[1], reverse=True)
+        # Asignar puesto (1, 2, 3...)
+        rankings_por_fecha[fecha] = {item[0]: idx + 1 for idx, item in enumerate(ordenados)}
         
-        if any(v is not None for v in valores_y):
-            plt.plot(fechas, valores_y, marker='o', label=aerolinea)
-
-    plt.title('Evolución de Eficiencia - HISPANA')
-    plt.xlabel('Fechas de Reporte')
-    plt.ylabel('% Eficiencia')
-    plt.grid(True, linestyle='--', alpha=0.7)
+    # 2. Determinar el ranking de la fecha actual para ordenar el Eje Y
+    ranking_actual_ordenado = sorted(rankings_por_fecha[fecha_actual].items(), key=lambda x: x[1])
+    aerolineas_actuales = [a for a, r in ranking_actual_ordenado]
     
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small', ncol=2)
+    # 3. Ajustar tamaño de la gráfica para que quepan todos los nombres cómodamente
+    altura_figura = max(8, len(aerolineas_actuales) * 0.4) 
+    plt.figure(figsize=(12, altura_figura))
+    
+    # 4. Graficar las líneas (Puesto vs Fecha)
+    for aerolinea in aerolineas_actuales:
+        valores_y = []
+        fechas_plot = []
+        for fecha in fechas:
+            rank = rankings_por_fecha[fecha].get(aerolinea)
+            if rank is not None:
+                valores_y.append(rank)
+                fechas_plot.append(fecha)
+        
+        if len(valores_y) > 0:
+            plt.plot(fechas_plot, valores_y, marker='o', linewidth=2)
+
+    # 5. Configurar Eje Y (Invertido para que el #1 esté arriba)
+    plt.gca().invert_yaxis()
+    
+    # Crear las etiquetas personalizadas para el Eje Y (Ej: "1. Fly Aces")
+    ticks_y = []
+    etiquetas_y = []
+    for aerolinea, rank in ranking_actual_ordenado:
+        ticks_y.append(rank)
+        etiquetas_y.append(f"{rank}. {aerolinea}")
+        
+    plt.yticks(ticks=ticks_y, labels=etiquetas_y, fontsize=10)
+    
+    # 6. Estilos Visuales (Sin leyenda a la derecha)
+    plt.title('Evolución de Posiciones en HISPANA', fontsize=16, pad=20, weight='bold')
+    plt.grid(True, linestyle='--', alpha=0.5, axis='x') # Solo rejilla vertical para no ensuciar
+    
+    # Limpiar bordes innecesarios
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.gca().spines['left'].set_visible(False)
+    plt.gca().spines['bottom'].set_color('#dddddd')
+    
     plt.tight_layout()
 
     buffer = io.BytesIO()
-    plt.savefig(buffer, format='png')
+    plt.savefig(buffer, format='png', bbox_inches='tight')
     buffer.seek(0)
     plt.close()
 
-    archivo_discord = discord.File(buffer, filename='grafica_eficiencia.png')
-    await ctx.send("📈 **Histórico de Eficiencia (Últimas 6 quincenas)**", file=archivo_discord)
+    archivo_discord = discord.File(buffer, filename='grafica_posiciones.png')
+    await ctx.send("📈 **Evolución del Ranking Interno (Basado en Eficiencia)**", file=archivo_discord)
 
 
 keep_alive()
