@@ -9,7 +9,6 @@ import matplotlib
 matplotlib.use('Agg') # Requerido para servidores sin interfaz gráfica como Render
 import matplotlib.pyplot as plt
 import io
-from datetime import datetime
 
 app = Flask('')
 
@@ -48,7 +47,7 @@ def guardar_en_historial(fecha, datos_actuales):
     with open(ARCHIVO_HISTORIAL, 'w', encoding='utf-8') as f:
         json.dump(historial, f, indent=4)
 
-# --- CARGA DE DATOS TXT ---
+# --- CARGA DE DATOS TXT CON FECHA INCORPORADA ---
 def cargar_datos_quincena(nombre_archivo):
     datos_aerolineas = {}
     datos_alianza = None
@@ -63,17 +62,20 @@ def cargar_datos_quincena(nombre_archivo):
                 
             partes = linea.strip().split(',')
             
-            if partes[0].strip().upper() == 'ALIANZA' and len(partes) >= 4:
+            # Formato Alianza: ALIANZA, YYYY-MM-DD, Rango, Valor, Crecimiento
+            if partes[0].strip().upper() == 'ALIANZA' and len(partes) >= 5:
                 try:
                     datos_alianza = {
-                        'rank': int(partes[1]),
-                        'valor': float(partes[2]),
-                        'crecimiento_diario': float(partes[3])
+                        'fecha': partes[1].strip(),
+                        'rank': int(partes[2]),
+                        'valor': float(partes[3]),
+                        'crecimiento_diario': float(partes[4])
                     }
                 except ValueError:
                     pass
                 continue
                 
+            # Formato Aerolínea: Nombre, Eficiencia, Promedio, Potencial
             if len(partes) >= 4:
                 nombre = partes[0].strip()
                 try:
@@ -109,15 +111,19 @@ async def reporte_quincena(ctx):
         await ctx.send("⚠️ Faltan datos de aerolíneas en los archivos de texto.")
         return
         
-    # --- GESTIÓN DE MEMORIA AUTOMÁTICA ---
-    fecha_hoy = datetime.now().strftime("%Y-%m-%d")
+    if not alianza_actual or 'fecha' not in alianza_actual:
+        await ctx.send("⚠️ El archivo `quincena_actual.txt` debe incluir la fecha en la línea de la ALIANZA (Ej: `ALIANZA, 2026-09-09, 109...`).")
+        return
+
+    # --- GESTIÓN DE MEMORIA USANDO LA FECHA DEL ARCHIVO ---
+    fecha_reporte_actual = alianza_actual['fecha']
     
     historial_temp = cargar_historial()
-    if len(historial_temp) == 0:
-        guardar_en_historial("2026-08-26", datos_pasados)
+    if len(historial_temp) == 0 and alianza_pasada and 'fecha' in alianza_pasada:
+        guardar_en_historial(alianza_pasada['fecha'], datos_pasados)
         
-    guardar_en_historial(fecha_hoy, datos_actuales)
-    # ---------------------------------------
+    guardar_en_historial(fecha_reporte_actual, datos_actuales)
+    # ----------------------------------------------------
 
     embed_resumen = Embed(title="📊 Reporte Quincenal HISPANA", color=discord.Color.green())
     if alianza_pasada and alianza_actual:
@@ -211,7 +217,7 @@ async def reporte_quincena(ctx):
         await ctx.send(embed=embed_chunk)
 
 
-# --- NUEVO COMANDO: GRÁFICA DE RANKING CON MOVIMIENTOS Y EFICIENCIA ---
+# --- COMANDO: GRÁFICA DE RANKING CON FECHAS REALES ---
 @bot.command(name='grafica_eficiencia')
 async def grafica_eficiencia(ctx):
     historial = cargar_historial()
@@ -224,7 +230,6 @@ async def grafica_eficiencia(ctx):
     fecha_actual = fechas[-1]
     fecha_anterior = fechas[-2]
     
-    # Transformar Eficiencias en Puestos de Ranking por fecha
     rankings_por_fecha = {}
     for fecha in fechas:
         datos_fecha = {a: e for a, e in historial[fecha].items() if e is not None}
@@ -254,7 +259,6 @@ async def grafica_eficiencia(ctx):
     ticks_y = []
     etiquetas_y = []
     
-    # Calcular movimiento, obtener eficiencia y armar etiquetas
     for aerolinea, rank_actual in ranking_actual_ordenado:
         ticks_y.append(rank_actual)
         
@@ -274,21 +278,17 @@ async def grafica_eficiencia(ctx):
             
         etiquetas_y.append(f"{rank_actual}. {aerolinea}  {mov}  [{eficiencia_actual}%]")
         
-    # Eje Y Izquierdo (Solo números)
     ax.set_yticks(ticks_y)
     ax.set_yticklabels([str(t) for t in ticks_y], fontsize=10, color='gray')
     
-    # Eje Y Derecho (Nombres actuales + Movimiento + Eficiencia)
     ax2 = ax.twinx()
     ax2.set_ylim(ax.get_ylim())
     ax2.set_yticks(ticks_y)
     ax2.set_yticklabels(etiquetas_y, fontsize=10, weight='bold')
     
-    # Título actualizado
     plt.title('Evolución de Posiciones en HISPANA - Ranking de Eficiencia', fontsize=16, pad=20, weight='bold')
     ax.grid(True, linestyle='--', alpha=0.5, axis='x') 
     
-    # Limpiar bordes
     for spine in ['top', 'bottom', 'right', 'left']:
         ax.spines[spine].set_visible(False)
         ax2.spines[spine].set_visible(False)
