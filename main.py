@@ -211,7 +211,7 @@ async def reporte_quincena(ctx):
         await ctx.send(embed=embed_chunk)
 
 
-# --- NUEVO COMANDO: GRÁFICA DE RANKING CON MOVIMIENTOS ---
+# --- NUEVO COMANDO: GRÁFICA DE RANKING CON MOVIMIENTOS Y EFICIENCIA ---
 @bot.command(name='grafica_eficiencia')
 async def grafica_eficiencia(ctx):
     historial = cargar_historial()
@@ -222,7 +222,7 @@ async def grafica_eficiencia(ctx):
 
     fechas = sorted(historial.keys())
     fecha_actual = fechas[-1]
-    fecha_anterior = fechas[-2] # Tomamos la quincena inmediatamente anterior para comparar
+    fecha_anterior = fechas[-2]
     
     # Transformar Eficiencias en Puestos de Ranking por fecha
     rankings_por_fecha = {}
@@ -254,11 +254,12 @@ async def grafica_eficiencia(ctx):
     ticks_y = []
     etiquetas_y = []
     
-    # Calcular movimiento y armar etiquetas
+    # Calcular movimiento, obtener eficiencia y armar etiquetas
     for aerolinea, rank_actual in ranking_actual_ordenado:
         ticks_y.append(rank_actual)
         
         rank_anterior = rankings_por_fecha[fecha_anterior].get(aerolinea)
+        eficiencia_actual = historial[fecha_actual].get(aerolinea, 0)
         
         if rank_anterior is not None:
             diferencia = rank_anterior - rank_actual
@@ -271,19 +272,20 @@ async def grafica_eficiencia(ctx):
         else:
             mov = "(Nuevo)"
             
-        etiquetas_y.append(f"{rank_actual}. {aerolinea}  {mov}")
+        etiquetas_y.append(f"{rank_actual}. {aerolinea}  {mov}  [{eficiencia_actual}%]")
         
     # Eje Y Izquierdo (Solo números)
     ax.set_yticks(ticks_y)
     ax.set_yticklabels([str(t) for t in ticks_y], fontsize=10, color='gray')
     
-    # Eje Y Derecho (Nombres actuales + Movimiento)
+    # Eje Y Derecho (Nombres actuales + Movimiento + Eficiencia)
     ax2 = ax.twinx()
     ax2.set_ylim(ax.get_ylim())
     ax2.set_yticks(ticks_y)
     ax2.set_yticklabels(etiquetas_y, fontsize=10, weight='bold')
     
-    plt.title('Evolución de Posiciones en HISPANA', fontsize=16, pad=20, weight='bold')
+    # Título actualizado
+    plt.title('Evolución de Posiciones en HISPANA - Ranking de Eficiencia', fontsize=16, pad=20, weight='bold')
     ax.grid(True, linestyle='--', alpha=0.5, axis='x') 
     
     # Limpiar bordes
