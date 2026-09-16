@@ -125,19 +125,23 @@ async def reporte_quincena(ctx):
     guardar_en_historial(fecha_reporte_actual, datos_actuales)
     # ----------------------------------------------------
 
+    # Extracción de fechas para el embed
+    f_pasada = alianza_pasada.get('fecha', 'Anterior') if alianza_pasada else 'Anterior'
+    f_actual = alianza_actual.get('fecha', 'Actual')
+
     embed_resumen = Embed(title="📊 Reporte Quincenal HISPANA", color=discord.Color.green())
     if alianza_pasada and alianza_actual:
         avance_rank = alianza_pasada['rank'] - alianza_actual['rank']
         icono_rank = "⬆️" if avance_rank > 0 else "⬇️" if avance_rank < 0 else "➖"
-        embed_resumen.add_field(name="🏆 Ranking Global", value=f"Anterior: **{alianza_pasada['rank']}**\nActual: **{alianza_actual['rank']}**\nMovimiento: {icono_rank} **{abs(avance_rank)}**", inline=True)
+        embed_resumen.add_field(name="🏆 Ranking Global", value=f"{f_pasada}: **{alianza_pasada['rank']}**\n{f_actual}: **{alianza_actual['rank']}**\nMovimiento: {icono_rank} **{abs(avance_rank)}**", inline=True)
         
         crecimiento_total = alianza_actual['valor'] - alianza_pasada['valor']
         icono_val = "📈" if crecimiento_total > 0 else "📉"
-        embed_resumen.add_field(name="💰 Valor de Alianza", value=f"Anterior: **${alianza_pasada['valor']:,.2f}**\nActual: **${alianza_actual['valor']:,.2f}**\nCrecimiento: {icono_val} **${crecimiento_total:,.2f}**", inline=True)
+        embed_resumen.add_field(name="💰 Valor de Alianza", value=f"{f_pasada}: **${alianza_pasada['valor']:,.2f}**\n{f_actual}: **${alianza_actual['valor']:,.2f}**\nCrecimiento: {icono_val} **${crecimiento_total:,.2f}**", inline=True)
         
         diff_crecimiento = alianza_actual['crecimiento_diario'] - alianza_pasada['crecimiento_diario']
         icono_crec = "🚀" if diff_crecimiento > 0 else "⚠️"
-        embed_resumen.add_field(name="📊 Crecimiento Diario", value=f"Anterior: **${alianza_pasada['crecimiento_diario']:,.2f}**\nActual: **${alianza_actual['crecimiento_diario']:,.2f}**\nVariación: {icono_crec} **${diff_crecimiento:,.2f}**", inline=True)
+        embed_resumen.add_field(name="📊 Crecimiento Diario", value=f"{f_pasada}: **${alianza_pasada['crecimiento_diario']:,.2f}**\n{f_actual}: **${alianza_actual['crecimiento_diario']:,.2f}**\nVariación: {icono_crec} **${diff_crecimiento:,.2f}**", inline=True)
         
     await ctx.send(embed=embed_resumen)
 
@@ -295,7 +299,7 @@ async def grafica_eficiencia(ctx):
         
     ax.tick_params(axis='y', length=0)
     ax2.tick_params(axis='y', length=0)
-    ax.tick_params(axis='x', color='gray')
+    ax2.tick_params(axis='x', color='gray')
     
     plt.tight_layout()
 
