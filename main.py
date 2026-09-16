@@ -211,7 +211,7 @@ async def reporte_quincena(ctx):
         await ctx.send(embed=embed_chunk)
 
 
-# --- NUEVO COMANDO: GRÁFICA DE RANKING MEJORADA ---
+# --- NUEVO COMANDO: GRÁFICA DE RANKING CON MOVIMIENTOS ---
 @bot.command(name='grafica_eficiencia')
 async def grafica_eficiencia(ctx):
     historial = cargar_historial()
@@ -222,6 +222,7 @@ async def grafica_eficiencia(ctx):
 
     fechas = sorted(historial.keys())
     fecha_actual = fechas[-1]
+    fecha_anterior = fechas[-2] # Tomamos la quincena inmediatamente anterior para comparar
     
     # Transformar Eficiencias en Puestos de Ranking por fecha
     rankings_por_fecha = {}
@@ -248,19 +249,35 @@ async def grafica_eficiencia(ctx):
         if len(valores_y) > 0:
             ax.plot(fechas_plot, valores_y, marker='o', linewidth=2)
 
-    ax.invert_yaxis() # Invertir para que el #1 quede arriba
+    ax.invert_yaxis() 
     
     ticks_y = []
     etiquetas_y = []
-    for aerolinea, rank in ranking_actual_ordenado:
-        ticks_y.append(rank)
-        etiquetas_y.append(f"{rank}. {aerolinea}")
+    
+    # Calcular movimiento y armar etiquetas
+    for aerolinea, rank_actual in ranking_actual_ordenado:
+        ticks_y.append(rank_actual)
+        
+        rank_anterior = rankings_por_fecha[fecha_anterior].get(aerolinea)
+        
+        if rank_anterior is not None:
+            diferencia = rank_anterior - rank_actual
+            if diferencia > 0:
+                mov = f"(▲ {diferencia})"
+            elif diferencia < 0:
+                mov = f"(▼ {abs(diferencia)})"
+            else:
+                mov = "(=)"
+        else:
+            mov = "(Nuevo)"
+            
+        etiquetas_y.append(f"{rank_actual}. {aerolinea}  {mov}")
         
     # Eje Y Izquierdo (Solo números)
     ax.set_yticks(ticks_y)
     ax.set_yticklabels([str(t) for t in ticks_y], fontsize=10, color='gray')
     
-    # Eje Y Derecho (Nombres actuales)
+    # Eje Y Derecho (Nombres actuales + Movimiento)
     ax2 = ax.twinx()
     ax2.set_ylim(ax.get_ylim())
     ax2.set_yticks(ticks_y)
@@ -269,7 +286,7 @@ async def grafica_eficiencia(ctx):
     plt.title('Evolución de Posiciones en HISPANA', fontsize=16, pad=20, weight='bold')
     ax.grid(True, linestyle='--', alpha=0.5, axis='x') 
     
-    # Limpiar bordes innecesarios para diseño limpio
+    # Limpiar bordes
     for spine in ['top', 'bottom', 'right', 'left']:
         ax.spines[spine].set_visible(False)
         ax2.spines[spine].set_visible(False)
