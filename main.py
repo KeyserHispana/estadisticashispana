@@ -4,6 +4,10 @@ import os
 import discord
 from discord.ext import commands
 from discord import Embed
+import json
+import matplotlib.pyplot as plt
+import io
+from datetime import datetime
 
 app = Flask('')
 
@@ -18,6 +22,35 @@ def keep_alive():
     t = Thread(target=run)
     t.start()
 
+# --- GESTIÓN DE MEMORIA (JSON) ---
+ARCHIVO_HISTORIAL = 'historial_eficiencia.json'
+
+def cargar_historial():
+    if not os.path.exists(ARCHIVO_HISTORIAL):
+        return {}
+    with open(ARCHIVO_HISTORIAL, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def guardar_en_historial(fecha, datos_actuales):
+    historial = cargar_historial()
+    
+    # Extraer solo la eficiencia para no hacer el archivo enorme
+    datos_guardar = {nombre: datos['eficiencia'] for nombre, datos in datos_actuales.items()}
+    
+    # Guardar usando la fecha como llave
+    historial[fecha] = datos_guardar
+    
+    # Mantener solo las últimas 6 fechas registradas
+    fechas_ordenadas = sorted(historial.keys())
+    if len(fechas_ordenadas) > 6:
+        fechas_a_borrar = fechas_ordenadas[:-6]
+        for f in fechas_a_borrar:
+            del historial[f]
+            
+    with open(ARCHIVO_HISTORIAL, 'w', encoding='utf-8') as f:
+        json.dump(historial, f, indent=4)
+
+# --- CARGA DE DATOS TXT ---
 def cargar_datos_quincena(nombre_archivo):
     datos_aerolineas = {}
     datos_alianza = None
@@ -43,18 +76,21 @@ def cargar_datos_quincena(nombre_archivo):
                     pass
                 continue
                 
-            if len(partes) >= 5:
+            # NUEVO FORMATO: Nombre, Acciones, C_Diaria, Potencial, Promedio, Eficiencia
+            if len(partes) >= 6:
                 nombre = partes[0].strip()
                 try:
                     acciones = float(partes[1])
-                    vuelos = int(partes[2])
-                    c_diaria = int(partes[3])
-                    eficiencia = int(partes[4])
+                    c_diaria = int(partes[2])
+                    potencial = float(partes[3])
+                    promedio = float(partes[4])
+                    eficiencia = int(partes[5])
                     
                     datos_aerolineas[nombre] = {
                         'acciones': acciones,
-                        'vuelos': vuelos,
                         'c_diaria': c_diaria,
+                        'potencial': potencial,
+                        'promedio': promedio,
                         'eficiencia': eficiencia
                     }
                 except ValueError:
@@ -79,33 +115,25 @@ async def reporte_quincena(ctx):
     if not datos_pasados or not datos_actuales:
         await ctx.send("⚠️ Faltan datos de aerolíneas en los archivos de texto.")
         return
+        
+    # Guardar en la memoria histórica
+    fecha_hoy = datetime.now().strftime("%Y-%m-%d")
+    guardar_en_historial(fecha_hoy, datos_actuales)
 
     # 1. Resumen General de la Alianza
     embed_resumen = Embed(title="📊 Reporte Quincenal HISPANA", color=discord.Color.green())
-    
     if alianza_pasada and alianza_actual:
         avance_rank = alianza_pasada['rank'] - alianza_actual['rank']
         icono_rank = "⬆️" if avance_rank > 0 else "⬇️" if avance_rank < 0 else "➖"
         embed_resumen.add_field(name="🏆 Ranking Global", value=f"Anterior: **{alianza_pasada['rank']}**\nActual: **{alianza_actual['rank']}**\nMovimiento: {icono_rank} **{abs(avance_rank)}**", inline=True)
-        
-        crecimiento_total = alianza_actual['valor'] - alianza_pasada['valor']
-        icono_val = "📈" if crecimiento_total > 0 else "📉"
-        embed_resumen.add_field(name="💰 Valor de Alianza", value=f"Anterior: **${alianza_pasada['valor']:,.2f}**\nActual: **${alianza_actual['valor']:,.2f}**\nCrecimiento: {icono_val} **${crecimiento_total:,.2f}**", inline=True)
-        
-        diff_crecimiento = alianza_actual['crecimiento_diario'] - alianza_pasada['crecimiento_diario']
-        icono_crec = "🚀" if diff_crecimiento > 0 else "⚠️"
-        embed_resumen.add_field(name="📊 Crecimiento Diario", value=f"Anterior: **${alianza_pasada['crecimiento_diario']:,.2f}**\nActual: **${alianza_actual['crecimiento_diario']:,.2f}**\nVariación: {icono_crec} **${diff_crecimiento:,.2f}**", inline=True)
-    
     await ctx.send(embed=embed_resumen)
 
-    # 2. Ordenar por Eficiencia y generar ranking interno
+    # 2. Ordenar por Eficiencia
     ranking_pasado = sorted(datos_pasados.items(), key=lambda x: x[1]['eficiencia'], reverse=True)
     ranking_actual = sorted(datos_actuales.items(), key=lambda x: x[1]['eficiencia'], reverse=True)
 
     pos_pasadas_dict = {nombre: idx + 1 for idx, (nombre, datos) in enumerate(ranking_pasado)}
-
     lineas_reporte = []
-    movimientos_lista = [] 
 
     for idx, (nombre, datos) in enumerate(ranking_actual):
         pos_actual = idx + 1
@@ -113,79 +141,86 @@ async def reporte_quincena(ctx):
 
         if pos_pasada:
             diferencia = pos_pasada - pos_actual
-            movimientos_lista.append({'nombre': nombre, 'dif': diferencia})
-            
-            if diferencia > 0:
-                movimiento = f"⬆️{diferencia}"
-            elif diferencia < 0:
-                movimiento = f"⬇️{abs(diferencia)}"
-            else:
-                movimiento = "➖0"
+            if diferencia > 0: movimiento = f"⬆️{diferencia}"
+            elif diferencia < 0: movimiento = f"⬇️{abs(diferencia)}"
+            else: movimiento = "➖0"
         else:
             movimiento = "🆕"
 
-        vuelos_fmt = f"{datos['vuelos']:,}"
         cd_fmt = f"{datos['c_diaria']:,}"
-        acciones_fmt = f"{datos['acciones']:,.2f}"
+        prom_fmt = f"{datos['promedio']:,.0f}"
+        pot_fmt = f"{datos['potencial']:,.1f}"
         
-        linea = f"**{pos_actual}.** {movimiento} | **{nombre}** (⚡**{datos['eficiencia']}%**) | 💲${acciones_fmt} | ✈️{vuelos_fmt} | 📊{cd_fmt}"
+        # LÍNEA OPTIMIZADA (Sin vuelos)
+        linea = f"**{pos_actual}.** {movimiento} | **{nombre}** (⚡**{datos['eficiencia']}%**) | 📊 CD:**{cd_fmt}** | Prom:**{prom_fmt}** | Pot:**{pot_fmt}**"
         lineas_reporte.append(linea)
 
-    # 3. CREAR LOS PODIOS (Tops) EN UN SOLO RENGLÓN EXCLUYENDO A KEYSER Y A LOS NUEVOS
-    # Solo se evalúan las aerolíneas que no son 'keyser' Y que estaban en la quincena pasada
-    ranking_para_podios = [item for item in ranking_actual if item[0].lower() != 'keyser' and item[0] in pos_pasadas_dict]
-    movimientos_sin_keyser = [x for x in movimientos_lista if x['nombre'].lower() != 'keyser']
-
-    los_que_subieron = sorted([x for x in movimientos_sin_keyser if x['dif'] > 0], key=lambda x: x['dif'], reverse=True)
-    los_que_bajaron = sorted([x for x in movimientos_sin_keyser if x['dif'] < 0], key=lambda x: x['dif']) 
-
-    top3_eficientes = ranking_para_podios[:3]
-    top3_menos_eficientes = ranking_para_podios[-3:]
-    top3_menos_eficientes.reverse() 
-
-    top3_subieron = los_que_subieron[:3]
-    top3_bajaron = los_que_bajaron[:3]
-
-    embed_tops = Embed(title="🏆 Podios de la Quincena", color=discord.Color.gold())
-
-    # Formato en una sola línea para eficiencia
-    txt_top_efi = "".join([f"**{i+1}.** {nom} (**{dat['eficiencia']}%**)\n" for i, (nom, dat) in enumerate(top3_eficientes)])
-    embed_tops.add_field(name="🌟 Más Eficientes", value=txt_top_efi if txt_top_efi else "N/A", inline=True)
-
-    txt_bot_efi = "".join([f"**{i+1}.** {nom} (**{dat['eficiencia']}%**)\n" for i, (nom, dat) in enumerate(top3_menos_eficientes)])
-    embed_tops.add_field(name="🐌 Menos Eficientes", value=txt_bot_efi if txt_bot_efi else "N/A", inline=True)
-    
-    embed_tops.add_field(name="\u200b", value="\u200b", inline=False) 
-
-    # Formato en una sola línea para movimientos
-    txt_top_sub = "".join([f"**{i+1}.** {item['nombre']} (⬆️{item['dif']})\n" for i, item in enumerate(top3_subieron)])
-    embed_tops.add_field(name="🚀 Más Avanzaron", value=txt_top_sub if txt_top_sub else "Nadie avanzó", inline=True)
-
-    txt_top_baj = "".join([f"**{i+1}.** {item['nombre']} (⬇️{abs(item['dif'])})\n" for i, item in enumerate(top3_bajaron)])
-    embed_tops.add_field(name="📉 Más Cayeron", value=txt_top_baj if txt_top_baj else "Nadie cayó", inline=True)
-
-    await ctx.send(embed=embed_tops)
-
-    # 4. Enviar el ranking general (con la leyenda al inicio del primer bloque y espaciado)
+    # Enviar el ranking general en bloques
     chunk_size = 15
-    
     for idx_chunk, i in enumerate(range(0, len(lineas_reporte), chunk_size)):
         chunk = lineas_reporte[i:i + chunk_size]
         texto_bloque = "\n\n".join(chunk)
         
-        # Si es el PRIMER bloque del ranking, le ponemos la leyenda justo antes
         if idx_chunk == 0:
             leyenda = (
-                "📖 **Leyenda del Ranking:**\n"
-                "• ⬆️/⬇️/➖ : Movimiento en eficiencia | 🆕 : Nueva\n"
-                "• ⚡ : % Eficiencia | 💲 : Acciones\n"
-                "• ✈️ : Vuelos | 📊 : Contribución Diaria (C/D)\n"
+                "📖 **Leyenda:** ⬆️/⬇️/➖ Movimiento | 🆕 Nueva | ⚡ % Eficiencia\n"
+                "📊 **CD:** Contribución Diaria | **Prom:** Promedio C/D | **Pot:** Potencial C/D\n"
                 "__________________________________________\n"
             )
             texto_bloque = leyenda + "\n" + texto_bloque
 
         embed_chunk = Embed(description=texto_bloque, color=discord.Color.blue())
         await ctx.send(embed=embed_chunk)
+
+
+# --- NUEVO COMANDO: GRÁFICA DE EFICIENCIA ---
+@bot.command(name='grafica_eficiencia')
+async def grafica_eficiencia(ctx):
+    historial = cargar_historial()
+    
+    if len(historial) < 2:
+        await ctx.send("⚠️ Aún no hay suficientes datos históricos. Ejecuta al menos 2 reportes quincenales en fechas distintas.")
+        return
+
+    fechas = sorted(historial.keys())
+    
+    # Identificar todas las aerolíneas que existen en el historial
+    aerolineas_todas = set()
+    for datos_fecha in historial.values():
+        aerolineas_todas.update(datos_fecha.keys())
+
+    plt.figure(figsize=(10, 6))
+    
+    # Graficar cada aerolínea
+    for aerolinea in aerolineas_todas:
+        valores_y = []
+        for fecha in fechas:
+            # Si no estaba en esa fecha, ponemos None para que no conecte la línea
+            eficiencia = historial[fecha].get(aerolinea, None)
+            valores_y.append(eficiencia)
+        
+        # Solo graficamos si tiene al menos un dato válido
+        if any(v is not None for v in valores_y):
+            plt.plot(fechas, valores_y, marker='o', label=aerolinea)
+
+    plt.title('Evolución de Eficiencia - HISPANA')
+    plt.xlabel('Fechas de Reporte')
+    plt.ylabel('% Eficiencia')
+    plt.grid(True, linestyle='--', alpha=0.7)
+    
+    # Ajustar la leyenda fuera del gráfico si son muchas aerolíneas
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small', ncol=2)
+    plt.tight_layout()
+
+    # Guardar gráfico en un buffer de memoria para enviarlo a Discord
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)
+    plt.close()
+
+    archivo_discord = discord.File(buffer, filename='grafica_eficiencia.png')
+    await ctx.send("📈 **Histórico de Eficiencia (Últimas 6 quincenas)**", file=archivo_discord)
+
 
 keep_alive()
 bot.run(os.environ['QUINCENAL_BOT_TOKEN'])
