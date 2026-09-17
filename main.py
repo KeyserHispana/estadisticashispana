@@ -158,7 +158,6 @@ async def reporte_semanal(ctx):
     for idx, (nombre, datos) in enumerate(ranking_actual):
         pos_actual = idx + 1
         
-        # VALIDACIÓN BLINDADA: Si está en el pasado calcula movimiento, si no, usa la variable movimiento_str con 🆕
         if nombre in pos_pasadas_dict:
             pos_pasada = pos_pasadas_dict[nombre]
             diferencia = pos_pasada - pos_actual
@@ -168,7 +167,7 @@ async def reporte_semanal(ctx):
             elif diferencia < 0: movimiento_str = f"⬇️{abs(diferencia)}"
             else: movimiento_str = "➖0"
         else:
-            movimiento_str = "🆕"
+            movimiento_str = "➖0"
 
         prom_fmt = f"{datos['promedio']:,.0f}"
         pot_fmt = f"{datos['potencial']:,.1f}"
@@ -220,8 +219,9 @@ async def reporte_semanal(ctx):
         texto_bloque = "\n\n".join(chunk)
         
         if idx_chunk == 0:
+            # LEYENDA LIMPIA: Sin rastro de la etiqueta nueva
             leyenda = (
-                "📖 **Leyenda:** ⬆️/⬇️/➖ Movimiento | 🆕 Nueva | ⚡ % Eficiencia\n"
+                "📖 **Leyenda:** ⬆️/⬇️/➖ Movimiento | ⚡ % Eficiencia\n"
                 "📊 **Prom:** Promedio C/D | **Pot:** Potencial C/D\n"
                 "__________________________________________\n"
             )
