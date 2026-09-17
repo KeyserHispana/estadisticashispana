@@ -35,9 +35,18 @@ def cargar_historial():
 def guardar_en_historial(fecha, datos_actuales):
     historial = cargar_historial()
     
-    datos_guardar = {nombre: datos['eficiencia'] for nombre, datos in datos_actuales.items()}
+    # Guardamos la eficiencia y el promedio/potencial para tenerlos a mano en el historial
+    datos_guardar = {}
+    for nombre, datos in datos_actuales.items():
+        datos_guardar[nombre] = {
+            'eficiencia': datos['eficiencia'],
+            'promedio': datos['promedio'],
+            'potencial': datos['potencial']
+        }
+    
     historial[fecha] = datos_guardar
     
+    # Mantener solo las últimas 6 fechas registradas
     fechas_ordenadas = sorted(historial.keys())
     if len(fechas_ordenadas) > 6:
         fechas_a_borrar = fechas_ordenadas[:-6]
@@ -220,21 +229,19 @@ async def reporte_quincena(ctx):
         await ctx.send(embed=embed_chunk)
 
 
-# --- COMANDO PÚBLICO 1: TARJETA DE AEROLÍNEA (!mi_aerolinea [Nombre]) ---
+# --- COMANDO PÚBLICO 1: TARJETA DE AEROLÍNEA CON HISTORIAL (MÁX. 3 QUINCENAS) ---
 @bot.command(name='mi_aerolinea')
 async def mi_aerolinea(ctx, *, nombre_buscado: str = None):
     if not nombre_buscado:
         await ctx.send("⚠️ Debes indicar el nombre de la aerolínea. Ejemplo: `!mi_aerolinea Fly Aces`")
         return
 
-    _, datos_pasados = cargar_datos_quincena('quincena_pasada.txt')
     _, datos_actuales = cargar_datos_quincena('quincena_actual.txt')
-
     if not datos_actuales:
         await ctx.send("⚠️ No hay datos actuales cargados en el sistema.")
         return
 
-    # Buscar coincidencia flexible (insensible a mayúsculas/minúsculas)
+    # Buscar coincidencia flexible
     nombre_encontrado = None
     for nom in datos_actuales.keys():
         if nombre_buscado.strip().lower() == nom.lower():
@@ -245,30 +252,43 @@ async def mi_aerolinea(ctx, *, nombre_buscado: str = None):
         await ctx.send(f"❌ No se encontró ninguna aerolínea con el nombre **'{nombre_buscado}'** en el registro actual.")
         return
 
-    # Calcular ranking actual y pasado
+    # Cargar el historial completo desde el JSON
+    historial = cargar_historial()
+    fechas_ordenadas = sorted(historial.keys())
+
+    # Tomar un máximo de las últimas 3 fechas disponibles
+    ultimas_fechas = fechas_ordenadas[-3:] if len(fechas_ordenadas) >= 3 else fechas_ordenadas
+
+    # Construir el bloque de estadísticas históricas
+    historial_texto = ""
+    for fecha in ultimas_fechas:
+        datos_en_fecha = historial[fecha]
+        if nombre_encontrado in datos_en_fecha:
+            eficiencia_h = datos_en_fecha[nombre_encontrado]['eficiencia']
+            
+            # Calcular ranking que tenía en esa fecha específica
+            ordenados_h = sorted(datos_en_fecha.items(), key=lambda x: x[1]['eficiencia'], reverse=True)
+            puesto_h = next((idx + 1 for idx, (nom, _) in enumerate(ordenados_h) if nom == nombre_encontrado), "N/A")
+            
+            historial_texto += f"• **{fecha}**: Puesto **#{puesto_h}** | Eficiencia: **{eficiencia_h}%**\n"
+        else:
+            historial_texto += f"• **{fecha}**: *Sin registro*\n"
+
+    # Datos actuales para el resumen rápido
     ranking_actual = sorted(datos_actuales.items(), key=lambda x: x[1]['eficiencia'], reverse=True)
-    ranking_pasado = sorted(datos_pasados.items(), key=lambda x: x[1]['eficiencia'], reverse=True) if datos_pasados else []
-
     pos_actual = next(idx + 1 for idx, (nom, _) in enumerate(ranking_actual) if nom == nombre_encontrado)
-    pos_pasada_dict = {nom: idx + 1 for idx, (nom, _) in enumerate(ranking_pasado)}
-    
     datos_aerolinea = datos_actuales[nombre_encontrado]
-    
-    # Calcular movimiento
-    if nombre_encontrado in pos_pasada_dict:
-        dif = pos_pasada_dict[nombre_encontrado] - pos_actual
-        if dif > 0: mov_str = f"⬆️ Subió {dif} puesto(s)"
-        elif dif < 0: mov_str = f"⬇️ Cayó {abs(dif)} puesto(s)"
-        else: mov_str = "➖ Se mantuvo"
-    else:
-        mov_str = "🆕 Aerolínea Nueva"
 
-    embed = Embed(title=f"✈️ Reporte de Aerolínea: {nombre_encontrado}", color=discord.Color.blue())
+    embed = Embed(title=f"✈️ Reporte Histórico: {nombre_encontrado}", color=discord.Color.blue())
+    embed.add_field(name="🏆 Posición Actual", value=f"**#{pos_actual}**", inline=True)
     embed.add_field(name="⚡ Eficiencia Actual", value=f"**{datos_aerolinea['eficiencia']}%**", inline=True)
-    embed.add_field(name="🏆 Posición en Ranking", value=f"**#{pos_actual}**", inline=True)
-    embed.add_field(name="📈 Movimiento", value=mov_str, inline=True)
-    embed.add_field(name="📊 Promedio C/D", value=f"${datos_aerolinea['promedio']:,.0f}", inline=True)
-    embed.add_field(name="🚀 Potencial C/D", value=f"${datos_aerolinea['potencial']:,.1f}", inline=True)
+    embed.add_field(name="\u200b", value="\u200b", inline=True)
+    
+    embed.add_field(name="📊 Promedio C/D Actual", value=f"${datos_aerolinea['promedio']:,.0f}", inline=True)
+    embed.add_field(name="🚀 Potencial C/D Actual", value=f"${datos_aerolinea['potencial']:,.1f}", inline=True)
+    embed.add_field(name="\u200b", value="\u200b", inline=True)
+
+    embed.add_field(name="📈 Evolución (Últimas Quincenas)", value=historial_texto if historial_texto else "Aún no hay suficiente historial guardado.", inline=False)
 
     await ctx.send(embed=embed)
 
@@ -296,9 +316,7 @@ async def enfrentar(ctx, *, texto_duelo: str = None):
         await ctx.send("⚠️ No hay datos actuales cargados.")
         return
 
-    # Encontrar aerolínea A
     nom_a = next((nom for nom in datos_actuales.keys() if busq_a.lower() == nom.lower()), None)
-    # Encontrar aerolínea B
     nom_b = next((nom for nom in datos_actuales.keys() if busq_b.lower() == nom.lower()), None)
 
     if not nom_a or not nom_b:
@@ -317,7 +335,6 @@ async def enfrentar(ctx, *, texto_duelo: str = None):
     embed.add_field(name=f"🛫 {nom_a}", value=f"• Puesto: **#{pos_a}**\n• Eficiencia: **{d_a['eficiencia']}%**\n• Prom: **${d_a['promedio']:,.0f}**\n• Pot: **${d_a['potencial']:,.1f}**", inline=True)
     embed.add_field(name=f"🛫 {nom_b}", value=f"• Puesto: **#{pos_b}**\n• Eficiencia: **{d_b['eficiencia']}%**\n• Prom: **${d_b['promedio']:,.0f}**\n• Pot: **${d_b['potencial']:,.1f}**", inline=True)
 
-    # Determinar ganador objetivo en eficiencia
     if d_a['eficiencia'] > d_b['eficiencia']:
         ganador_txt = f"🏆 **Ganador en Eficiencia:** {nom_a} (+{d_a['eficiencia'] - d_b['eficiencia']}% vs {nom_b})"
     elif d_b['eficiencia'] > d_a['eficiencia']:
@@ -345,7 +362,7 @@ async def grafica_eficiencia(ctx):
     
     rankings_por_fecha = {}
     for fecha in fechas:
-        datos_fecha = {a: e for a, e in historial[fecha].items() if e is not None}
+        datos_fecha = {a: d['eficiencia'] for a, d in historial[fecha].items() if d is not None}
         ordenados = sorted(datos_fecha.items(), key=lambda x: x[1], reverse=True)
         rankings_por_fecha[fecha] = {item[0]: idx + 1 for idx, item in enumerate(ordenados)}
         
@@ -376,7 +393,7 @@ async def grafica_eficiencia(ctx):
         ticks_y.append(rank_actual)
         
         rank_anterior = rankings_por_fecha[fecha_anterior].get(aerolinea)
-        eficiencia_actual = historial[fecha_actual].get(aerolinea, 0)
+        eficiencia_actual = historial[fecha_actual][aerolinea]['eficiencia'] if aerolinea in historial[fecha_actual] else 0
         
         if rank_anterior is not None:
             diferencia = rank_anterior - rank_actual
