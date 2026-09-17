@@ -175,7 +175,6 @@ async def reporte_semanal(ctx):
         linea = f"**{pos_actual}.** {movimiento_str} | **{nombre}** (⚡**{datos['eficiencia']}%**) | Prom:**{prom_fmt}** | Pot:**{pot_fmt}**"
         lineas_reporte.append(linea)
 
-    # FILTRO PARA PODIOS: Solo veteranas reales (que están en pos_pasadas_dict), excluyendo a Keyser y eficiencias de 0
     veteranas_actuales = {
         k: v for k, v in datos_actuales.items() 
         if k in pos_pasadas_dict and k.lower() != 'keyser' and v['eficiencia'] > 0
@@ -219,7 +218,6 @@ async def reporte_semanal(ctx):
         texto_bloque = "\n\n".join(chunk)
         
         if idx_chunk == 0:
-            # LEYENDA LIMPIA: Sin rastro de la etiqueta nueva
             leyenda = (
                 "📖 **Leyenda:** ⬆️/⬇️/➖ Movimiento | ⚡ % Eficiencia\n"
                 "📊 **Prom:** Promedio C/D | **Pot:** Potencial C/D\n"
@@ -347,7 +345,10 @@ async def grafica_eficiencia(ctx):
         await ctx.send("⚠️ Aún no hay suficientes datos históricos. El bot necesita tener guardadas al menos 2 semanas para comparar.")
         return
 
-    fechas = sorted(historial.keys())
+    # Tomamos un máximo de las últimas 6 fechas disponibles en el historial
+    fechas_todas = sorted(historial.keys())
+    fechas = fechas_todas[-6:]
+    
     fecha_actual = fechas[-1]
     fecha_anterior = fechas[-2]
     
@@ -361,7 +362,7 @@ async def grafica_eficiencia(ctx):
     aerolineas_actuales = [a for a, r in ranking_actual_ordenado]
     
     altura_figura = max(8, len(aerolineas_actuales) * 0.4) 
-    fig, ax = plt.subplots(figsize=(12, altura_figura))
+    fig, ax = plt.subplots(figsize=(14, altura_figura))
     
     for aerolinea in aerolineas_actuales:
         valores_y = []
@@ -408,7 +409,13 @@ async def grafica_eficiencia(ctx):
     ax2.set_yticks(ticks_y)
     ax2.set_yticklabels(etiquetas_y, fontsize=10, weight='bold')
     
-    plt.title('Evolución de Posiciones en HISPANA - Ranking de Eficiencia', fontsize=16, pad=20, weight='bold')
+    # Mostramos en el título el rango de fechas que abarca la gráfica (hasta 6)
+    rango_texto = f"Del {fechas[0]} al {fechas[-1]}" if len(fechas) > 1 else fechas[0]
+    plt.title(f'Evolución del Ranking Interno - HISPana ({rango_texto})', fontsize=16, pad=20, weight='bold')
+    
+    ax.set_xticks(range(len(fechas)))
+    ax.set_xticklabels(fechas, rotation=15, fontsize=10)
+    
     ax.grid(True, linestyle='--', alpha=0.5, axis='x') 
     
     for spine in ['top', 'bottom', 'right', 'left']:
@@ -427,7 +434,7 @@ async def grafica_eficiencia(ctx):
     plt.close(fig)
 
     archivo_discord = discord.File(buffer, filename='grafica_posiciones.png')
-    await ctx.send("📈 **Evolución del Ranking Interno (Basado en Eficiencia)**", file=archivo_discord)
+    await ctx.send("📈 **Evolución Histórica del Ranking Interno (Últimas semanas)**", file=archivo_discord)
 
 
 keep_alive()
