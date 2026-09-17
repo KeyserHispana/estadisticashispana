@@ -157,9 +157,10 @@ async def reporte_semanal(ctx):
 
     for idx, (nombre, datos) in enumerate(ranking_actual):
         pos_actual = idx + 1
-        pos_pasada = pos_pasadas_dict.get(nombre)
-
-        if pos_pasada:
+        
+        # VALIDACIÓN ESTRICTA DE NUEVA: Si el nombre no está exactamente en el archivo pasado, es 🆕
+        if nombre in pos_pasadas_dict:
+            pos_pasada = pos_pasadas_dict[nombre]
             diferencia = pos_pasada - pos_actual
             movimientos_lista.append({'nombre': nombre, 'dif': diferencia})
             
@@ -175,10 +176,9 @@ async def reporte_semanal(ctx):
         linea = f"**{pos_actual}.** {movimiento} | **{nombre}** (⚡**{datos['eficiencia']}%**) | Prom:**{prom_fmt}** | Pot:**{pot_fmt}**"
         lineas_reporte.append(linea)
 
-    # FILTREMOS PRIMERO: Solo veteranas (que están en pos_pasadas_dict) y excluyendo a Keyser
+    # VETERANAS: Únicamente las que SÍ estaban la semana pasada y excluyendo a Keyser
     veteranas_actuales = {k: v for k, v in datos_actuales.items() if k in pos_pasadas_dict and k.lower() != 'keyser'}
 
-    # Ordenamos únicamente a las veteranas por eficiencia
     ranking_veteranas = sorted(veteranas_actuales.items(), key=lambda x: x[1]['eficiencia'], reverse=True)
 
     movimientos_sin_keyser = [x for x in movimientos_lista if x['nombre'].lower() != 'keyser' and x['nombre'] in pos_pasadas_dict]
