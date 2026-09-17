@@ -175,15 +175,19 @@ async def reporte_semanal(ctx):
         linea = f"**{pos_actual}.** {movimiento} | **{nombre}** (⚡**{datos['eficiencia']}%**) | Prom:**{prom_fmt}** | Pot:**{pot_fmt}**"
         lineas_reporte.append(linea)
 
-    # FILTRO ESTRICTO: Excluye a Keyser y EXCLUYE obligatoriamente a las aerolíneas nuevas (que no están en pos_pasadas_dict)
-    ranking_para_podios = [item for item in ranking_actual if item[0].lower() != 'keyser' and item[0] in pos_pasadas_dict]
-    movimientos_sin_keyser = [x for x in movimientos_lista if x['nombre'].lower() != 'keyser']
+    # FILTREMOS PRIMERO: Solo veteranas (que están en pos_pasadas_dict) y excluyendo a Keyser
+    veteranas_actuales = {k: v for k, v in datos_actuales.items() if k in pos_pasadas_dict and k.lower() != 'keyser'}
+
+    # Ordenamos únicamente a las veteranas por eficiencia
+    ranking_veteranas = sorted(veteranas_actuales.items(), key=lambda x: x[1]['eficiencia'], reverse=True)
+
+    movimientos_sin_keyser = [x for x in movimientos_lista if x['nombre'].lower() != 'keyser' and x['nombre'] in pos_pasadas_dict]
 
     los_que_subieron = sorted([x for x in movimientos_sin_keyser if x['dif'] > 0], key=lambda x: x['dif'], reverse=True)
     los_que_bajaron = sorted([x for x in movimientos_sin_keyser if x['dif'] < 0], key=lambda x: x['dif']) 
 
-    top3_eficientes = ranking_para_podios[:3]
-    top3_menos_eficientes = ranking_para_podios[-3:] if len(ranking_para_podios) >= 3 else ranking_para_podios
+    top3_eficientes = ranking_veteranas[:3]
+    top3_menos_eficientes = ranking_veteranas[-3:] if len(ranking_veteranas) >= 3 else ranking_veteranas
     top3_menos_eficientes.reverse() 
 
     top3_subieron = los_que_subieron[:3]
