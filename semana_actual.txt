@@ -12,7 +12,7 @@ Ariza Airlines SKY, 49, 55221, 112.860
 Nike-Air, 56, 73999, 131.955
 Palmera Flight, 39, 55869, 143.925
 LucianAir, 44, 48933, 110.010
-IntiTravel Quis, 39, 48744, 124.830
+IntlTravel Quis, 39, 48744, 124.830
 Lineas Aereas Austral, 32, 42313, 131.100
 Bodoque Airlines, 37, 47170, 127.965
 THE DAI KIRI company, 47, 48552, 103.455
