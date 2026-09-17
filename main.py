@@ -57,7 +57,7 @@ def guardar_en_historial(fecha, datos_actuales):
         json.dump(historial, f, indent=4)
 
 # --- CARGA DE DATOS TXT CON FECHA INCORPORADA ---
-def cargar_datos_quincena(nombre_archivo):
+def cargar_datos_semana(nombre_archivo):
     datos_aerolineas = {}
     datos_alianza = None
     
@@ -111,17 +111,17 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 async def on_ready():
     print(f"Bot de Estadisticas conectado como {bot.user}")
 
-@bot.command(name='reporte_quincena')
-async def reporte_quincena(ctx):
-    alianza_pasada, datos_pasados = cargar_datos_quincena('quincena_pasada.txt')
-    alianza_actual, datos_actuales = cargar_datos_quincena('quincena_actual.txt')
+@bot.command(name='reporte_semanal')
+async def reporte_semanal(ctx):
+    alianza_pasada, datos_pasados = cargar_datos_semana('semana_pasada.txt')
+    alianza_actual, datos_actuales = cargar_datos_semana('semana_actual.txt')
     
     if not datos_pasados or not datos_actuales:
         await ctx.send("⚠️ Faltan datos de aerolíneas en los archivos de texto.")
         return
         
     if not alianza_actual or 'fecha' not in alianza_actual:
-        await ctx.send("⚠️ El archivo `quincena_actual.txt` debe incluir la fecha en la línea de la ALIANZA (Ej: `ALIANZA, 2026-09-09, 109...`).")
+        await ctx.send("⚠️ El archivo `semana_actual.txt` debe incluir la fecha en la línea de la ALIANZA (Ej: `ALIANZA, 2026-09-09, 109...`).")
         return
 
     # --- GESTIÓN DE MEMORIA USANDO LA FECHA DEL ARCHIVO ---
@@ -137,7 +137,7 @@ async def reporte_quincena(ctx):
     f_pasada = alianza_pasada.get('fecha', 'Anterior') if alianza_pasada else 'Anterior'
     f_actual = alianza_actual.get('fecha', 'Actual')
 
-    embed_resumen = Embed(title="📊 Reporte Quincenal HISPANA", color=discord.Color.green())
+    embed_resumen = Embed(title="📊 Reporte Semanal HISPANA", color=discord.Color.green())
     if alianza_pasada and alianza_actual:
         avance_rank = alianza_pasada['rank'] - alianza_actual['rank']
         icono_rank = "⬆️" if avance_rank > 0 else "⬇️" if avance_rank < 0 else "➖"
@@ -194,7 +194,7 @@ async def reporte_quincena(ctx):
     top3_subieron = los_que_subieron[:3]
     top3_bajaron = los_que_bajaron[:3]
 
-    embed_tops = Embed(title=f"🏆 Podios de la Quincena ({f_actual})", color=discord.Color.gold())
+    embed_tops = Embed(title=f"🏆 Podios de la Semana ({f_actual})", color=discord.Color.gold())
 
     txt_top_efi = "".join([f"**{i+1}.** {nom} (**{dat['eficiencia']}%**)\n" for i, (nom, dat) in enumerate(top3_eficientes)])
     embed_tops.add_field(name="🌟 Más Eficientes", value=txt_top_efi if txt_top_efi else "N/A", inline=True)
@@ -229,14 +229,14 @@ async def reporte_quincena(ctx):
         await ctx.send(embed=embed_chunk)
 
 
-# --- COMANDO PÚBLICO 1: TARJETA DE AEROLÍNEA CON HISTORIAL (MÁX. 3 QUINCENAS) ---
+# --- COMANDO PÚBLICO 1: TARJETA DE AEROLÍNEA CON HISTORIAL (MÁX. 3 SEMANAS) ---
 @bot.command(name='mi_aerolinea')
 async def mi_aerolinea(ctx, *, nombre_buscado: str = None):
     if not nombre_buscado:
         await ctx.send("⚠️ Debes indicar el nombre de la aerolínea. Ejemplo: `!mi_aerolinea Fly Aces`")
         return
 
-    _, datos_actuales = cargar_datos_quincena('quincena_actual.txt')
+    _, datos_actuales = cargar_datos_semana('semana_actual.txt')
     if not datos_actuales:
         await ctx.send("⚠️ No hay datos actuales cargados en el sistema.")
         return
@@ -288,12 +288,12 @@ async def mi_aerolinea(ctx, *, nombre_buscado: str = None):
     embed.add_field(name="🚀 Potencial C/D Actual", value=f"${datos_aerolinea['potencial']:,.1f}", inline=True)
     embed.add_field(name="\u200b", value="\u200b", inline=True)
 
-    embed.add_field(name="📈 Evolución (Últimas Quincenas)", value=historial_texto if historial_texto else "Aún no hay suficiente historial guardado.", inline=False)
+    embed.add_field(name="📈 Evolución (Últimas Semanas)", value=historial_texto if historial_texto else "Aún no hay suficiente historial guardado.", inline=False)
 
     await ctx.send(embed=embed)
 
 
-# --- COMANDO PÚBLICO 2: DUELO QUINCENAL (!enfrentar [A] vs [B]) ---
+# --- COMANDO PÚBLICO 2: DUELO SEMANAL (!enfrentar [A] vs [B]) ---
 @bot.command(name='enfrentar')
 async def enfrentar(ctx, *, texto_duelo: str = None):
     if not texto_duelo or 'vs' not in texto_duelo.lower():
@@ -311,7 +311,7 @@ async def enfrentar(ctx, *, texto_duelo: str = None):
     busq_a = partes[0].strip()
     busq_b = partes[1].strip()
 
-    _, datos_actuales = cargar_datos_quincena('quincena_actual.txt')
+    _, datos_actuales = cargar_datos_semana('semana_actual.txt')
     if not datos_actuales:
         await ctx.send("⚠️ No hay datos actuales cargados.")
         return
@@ -330,7 +330,7 @@ async def enfrentar(ctx, *, texto_duelo: str = None):
     d_a = datos_actuales[nom_a]
     d_b = datos_actuales[nom_b]
 
-    embed = Embed(title=f"⚔️ Duelo Quincenal: {nom_a} vs {nom_b}", color=discord.Color.purple())
+    embed = Embed(title=f"⚔️ Duelo Semanal: {nom_a} vs {nom_b}", color=discord.Color.purple())
     
     embed.add_field(name=f"🛫 {nom_a}", value=f"• Puesto: **#{pos_a}**\n• Eficiencia: **{d_a['eficiencia']}%**\n• Prom: **${d_a['promedio']:,.0f}**\n• Pot: **${d_a['potencial']:,.1f}**", inline=True)
     embed.add_field(name=f"🛫 {nom_b}", value=f"• Puesto: **#{pos_b}**\n• Eficiencia: **{d_b['eficiencia']}%**\n• Prom: **${d_b['promedio']:,.0f}**\n• Pot: **${d_b['potencial']:,.1f}**", inline=True)
@@ -353,7 +353,7 @@ async def grafica_eficiencia(ctx):
     historial = cargar_historial()
     
     if len(historial) < 2:
-        await ctx.send("⚠️ Aún no hay suficientes datos históricos. El bot necesita tener guardadas al menos 2 quincenas para comparar.")
+        await ctx.send("⚠️ Aún no hay suficientes datos históricos. El bot necesita tener guardadas al menos 2 semanas para comparar.")
         return
 
     fechas = sorted(historial.keys())
