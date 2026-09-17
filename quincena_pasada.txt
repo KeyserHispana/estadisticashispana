@@ -7,7 +7,7 @@ Nike-Air, 61, 79919, 130.245
 Snookski Air, 66, 105553, 160.740
 Denati Airlines, 54, 61760, 114.570
 ERCOM AIRWAYS, 38, 49844, 129.675
-IntiTravel Quis, 33, 40498, 123.690
+IntlTravel Quis, 33, 40498, 123.690
 Palmera Flight, 38, 54137, 143.070
 Bodoque Airlines, 40, 50101, 126.540
 Voyage Air Inc, 36, 40897, 114.000
