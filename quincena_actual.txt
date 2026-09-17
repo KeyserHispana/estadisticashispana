@@ -23,7 +23,7 @@ EDRO AIR, 38, 40396, 106.875
 Uruguay International, 35, 38819, 112.005
 Denati Airlines, 54, 62788, 115.710
 Blueways Airline - BA, 31, 32671, 106.305
-IntiTravel Quis, 34, 42027, 123.975
+IntlTravel Quis, 34, 42027, 123.975
 SAM8 Air, 28, 29302, 104.310
 Volemos, 56, 36384, 64.695
 UTAG National Airlines, 33, 33513, 102.030
