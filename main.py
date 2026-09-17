@@ -158,22 +158,22 @@ async def reporte_semanal(ctx):
     for idx, (nombre, datos) in enumerate(ranking_actual):
         pos_actual = idx + 1
         
-        # VALIDACIÓN BLINDADA PARA EL LISTADO GENERAL: Si está en el pasado, calcula movimiento. Si no, es estrictamente 🆕
+        # VALIDACIÓN BLINDADA: Si está en el pasado calcula movimiento, si no, usa la variable movimiento_str con 🆕
         if nombre in pos_pasadas_dict:
             pos_pasada = pos_pasadas_dict[nombre]
             diferencia = pos_pasada - pos_actual
             movimientos_lista.append({'nombre': nombre, 'dif': diferencia})
             
-            if diferencia > 0: movimiento = f"⬆️{diferencia}"
-            elif diferencia < 0: movimiento = f"⬇️{abs(diferencia)}"
-            else: movimiento = "➖0"
+            if diferencia > 0: movimiento_str = f"⬆️{diferencia}"
+            elif diferencia < 0: movimiento_str = f"⬇️{abs(diferencia)}"
+            else: movimiento_str = "➖0"
         else:
-            movimiento = "🆕"
+            movimiento_str = "🆕"
 
         prom_fmt = f"{datos['promedio']:,.0f}"
         pot_fmt = f"{datos['potencial']:,.1f}"
         
-        linea = f"**{pos_actual}.** {movimiento} | **{nombre}** (⚡**{datos['eficiencia']}%**) | Prom:**{prom_fmt}** | Pot:**{pot_fmt}**"
+        linea = f"**{pos_actual}.** {movimiento_str} | **{nombre}** (⚡**{datos['eficiencia']}%**) | Prom:**{prom_fmt}** | Pot:**{pot_fmt}**"
         lineas_reporte.append(linea)
 
     # FILTRO PARA PODIOS: Solo veteranas reales (que están en pos_pasadas_dict), excluyendo a Keyser y eficiencias de 0
