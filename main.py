@@ -158,7 +158,7 @@ async def reporte_semanal(ctx):
     for idx, (nombre, datos) in enumerate(ranking_actual):
         pos_actual = idx + 1
         
-        # VALIDACIÓN ESTRICTA DE NUEVA: Si el nombre no está exactamente en el archivo pasado, es 🆕
+        # VALIDACIÓN ABSOLUTA: Si no está en el archivo pasado, es estrictamente 🆕
         if nombre in pos_pasadas_dict:
             pos_pasada = pos_pasadas_dict[nombre]
             diferencia = pos_pasada - pos_actual
@@ -176,8 +176,11 @@ async def reporte_semanal(ctx):
         linea = f"**{pos_actual}.** {movimiento} | **{nombre}** (⚡**{datos['eficiencia']}%**) | Prom:**{prom_fmt}** | Pot:**{pot_fmt}**"
         lineas_reporte.append(linea)
 
-    # VETERANAS: Únicamente las que SÍ estaban la semana pasada y excluyendo a Keyser
-    veteranas_actuales = {k: v for k, v in datos_actuales.items() if k in pos_pasadas_dict and k.lower() != 'keyser'}
+    # FILTRO BLINDADO PARA PODIOS: Solo veteranas reales (que están en pos_pasadas_dict), excluyendo a Keyser y descartando eficiencias de 0
+    veteranas_actuales = {
+        k: v for k, v in datos_actuales.items() 
+        if k in pos_pasadas_dict and k.lower() != 'keyser' and v['eficiencia'] > 0
+    }
 
     ranking_veteranas = sorted(veteranas_actuales.items(), key=lambda x: x[1]['eficiencia'], reverse=True)
 
@@ -369,8 +372,9 @@ async def grafica_eficiencia(ctx):
                 valores_y.append(rank)
                 fechas_plot.append(fecha)
         
-        if len(valores_y) > 0:
-            ax.plot(fechas_plot, valores_y, marker='o', linewidth=2)
+        y_vals = valores_y
+        if len(y_vals) > 0:
+            ax.plot(fechas_plot, y_vals, marker='o', linewidth=2)
 
     ax.invert_yaxis() 
     
