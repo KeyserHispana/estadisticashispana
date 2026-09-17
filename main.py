@@ -35,7 +35,6 @@ def cargar_historial():
 def guardar_en_historial(fecha, datos_actuales):
     historial = cargar_historial()
     
-    # Guardamos la eficiencia y el promedio/potencial para tenerlos a mano en el historial
     datos_guardar = {}
     for nombre, datos in datos_actuales.items():
         datos_guardar[nombre] = {
@@ -46,7 +45,6 @@ def guardar_en_historial(fecha, datos_actuales):
     
     historial[fecha] = datos_guardar
     
-    # Mantener solo las últimas 6 fechas registradas
     fechas_ordenadas = sorted(historial.keys())
     if len(fechas_ordenadas) > 6:
         fechas_a_borrar = fechas_ordenadas[:-6]
@@ -71,7 +69,6 @@ def cargar_datos_semana(nombre_archivo):
                 
             partes = linea.strip().split(',')
             
-            # Formato Alianza: ALIANZA, YYYY-MM-DD, Rango, Valor, Crecimiento
             if partes[0].strip().upper() == 'ALIANZA' and len(partes) >= 5:
                 try:
                     datos_alianza = {
@@ -84,7 +81,6 @@ def cargar_datos_semana(nombre_archivo):
                     pass
                 continue
                 
-            # Formato Aerolínea: Nombre, Eficiencia, Promedio, Potencial
             if len(partes) >= 4:
                 nombre = partes[0].strip()
                 try:
@@ -121,10 +117,9 @@ async def reporte_semanal(ctx):
         return
         
     if not alianza_actual or 'fecha' not in alianza_actual:
-        await ctx.send("⚠️ El archivo `semana_actual.txt` debe incluir la fecha en la línea de la ALIANZA (Ej: `ALIANZA, 2026-09-09, 109...`).")
+        await ctx.send("⚠️ El archivo `semana_actual.txt` debe incluir la fecha en la línea de la ALIANZA.")
         return
 
-    # --- GESTIÓN DE MEMORIA USANDO LA FECHA DEL ARCHIVO ---
     fecha_reporte_actual = alianza_actual['fecha']
     
     historial_temp = cargar_historial()
@@ -132,7 +127,6 @@ async def reporte_semanal(ctx):
         guardar_en_historial(alianza_pasada['fecha'], datos_pasados)
         
     guardar_en_historial(fecha_reporte_actual, datos_actuales)
-    # ----------------------------------------------------
 
     f_pasada = alianza_pasada.get('fecha', 'Anterior') if alianza_pasada else 'Anterior'
     f_actual = alianza_actual.get('fecha', 'Actual')
@@ -181,6 +175,7 @@ async def reporte_semanal(ctx):
         linea = f"**{pos_actual}.** {movimiento} | **{nombre}** (⚡**{datos['eficiencia']}%**) | Prom:**{prom_fmt}** | Pot:**{pot_fmt}**"
         lineas_reporte.append(linea)
 
+    # FILTRO ESTRICTO: Excluye a Keyser y EXCLUYE obligatoriamente a las aerolíneas nuevas (que no están en pos_pasadas_dict)
     ranking_para_podios = [item for item in ranking_actual if item[0].lower() != 'keyser' and item[0] in pos_pasadas_dict]
     movimientos_sin_keyser = [x for x in movimientos_lista if x['nombre'].lower() != 'keyser']
 
@@ -188,7 +183,7 @@ async def reporte_semanal(ctx):
     los_que_bajaron = sorted([x for x in movimientos_sin_keyser if x['dif'] < 0], key=lambda x: x['dif']) 
 
     top3_eficientes = ranking_para_podios[:3]
-    top3_menos_eficientes = ranking_para_podios[-3:]
+    top3_menos_eficientes = ranking_para_podios[-3:] if len(ranking_para_podios) >= 3 else ranking_para_podios
     top3_menos_eficientes.reverse() 
 
     top3_subieron = los_que_subieron[:3]
@@ -229,7 +224,7 @@ async def reporte_semanal(ctx):
         await ctx.send(embed=embed_chunk)
 
 
-# --- COMANDO PÚBLICO 1: TARJETA DE AEROLÍNEA CON HISTORIAL (MÁX. 3 SEMANAS) ---
+# --- COMANDOS PÚBLICOS ADICIONALES ---
 @bot.command(name='mi_aerolinea')
 async def mi_aerolinea(ctx, *, nombre_buscado: str = None):
     if not nombre_buscado:
@@ -241,7 +236,6 @@ async def mi_aerolinea(ctx, *, nombre_buscado: str = None):
         await ctx.send("⚠️ No hay datos actuales cargados en el sistema.")
         return
 
-    # Buscar coincidencia flexible
     nombre_encontrado = None
     for nom in datos_actuales.keys():
         if nombre_buscado.strip().lower() == nom.lower():
@@ -252,29 +246,21 @@ async def mi_aerolinea(ctx, *, nombre_buscado: str = None):
         await ctx.send(f"❌ No se encontró ninguna aerolínea con el nombre **'{nombre_buscado}'** en el registro actual.")
         return
 
-    # Cargar el historial completo desde el JSON
     historial = cargar_historial()
     fechas_ordenadas = sorted(historial.keys())
-
-    # Tomar un máximo de las últimas 3 fechas disponibles
     ultimas_fechas = fechas_ordenadas[-3:] if len(fechas_ordenadas) >= 3 else fechas_ordenadas
 
-    # Construir el bloque de estadísticas históricas
     historial_texto = ""
     for fecha in ultimas_fechas:
         datos_en_fecha = historial[fecha]
         if nombre_encontrado in datos_en_fecha:
             eficiencia_h = datos_en_fecha[nombre_encontrado]['eficiencia']
-            
-            # Calcular ranking que tenía en esa fecha específica
             ordenados_h = sorted(datos_en_fecha.items(), key=lambda x: x[1]['eficiencia'], reverse=True)
             puesto_h = next((idx + 1 for idx, (nom, _) in enumerate(ordenados_h) if nom == nombre_encontrado), "N/A")
-            
             historial_texto += f"• **{fecha}**: Puesto **#{puesto_h}** | Eficiencia: **{eficiencia_h}%**\n"
         else:
             historial_texto += f"• **{fecha}**: *Sin registro*\n"
 
-    # Datos actuales para el resumen rápido
     ranking_actual = sorted(datos_actuales.items(), key=lambda x: x[1]['eficiencia'], reverse=True)
     pos_actual = next(idx + 1 for idx, (nom, _) in enumerate(ranking_actual) if nom == nombre_encontrado)
     datos_aerolinea = datos_actuales[nombre_encontrado]
@@ -293,7 +279,6 @@ async def mi_aerolinea(ctx, *, nombre_buscado: str = None):
     await ctx.send(embed=embed)
 
 
-# --- COMANDO PÚBLICO 2: DUELO SEMANAL (!enfrentar [A] vs [B]) ---
 @bot.command(name='enfrentar')
 async def enfrentar(ctx, *, texto_duelo: str = None):
     if not texto_duelo or 'vs' not in texto_duelo.lower():
@@ -347,7 +332,6 @@ async def enfrentar(ctx, *, texto_duelo: str = None):
     await ctx.send(embed=embed)
 
 
-# --- COMANDO: GRÁFICA DE RANKING CON FECHAS REALES ---
 @bot.command(name='grafica_eficiencia')
 async def grafica_eficiencia(ctx):
     historial = cargar_historial()
